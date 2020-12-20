@@ -1,3 +1,10 @@
 <h2 id="title">Welcome to Ember</h2>
 
+<button {{on "click" (fn (mut this.x) 0)}} type="button">To the left</button>
+<button {{on "click" (fn (mut this.x) 100)}} type="button">To the right</button>
+
+<Motion @animate={{hash x=this.x}} style="height: 100px; width: 100px; background: red;">
+  Test
+</Motion>
+
 {{outlet}}
