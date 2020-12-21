@@ -1,10 +1,39 @@
 <h2 id="title">Welcome to Ember</h2>
 
 <button {{on "click" (fn (mut this.x) 0)}} type="button">To the left</button>
-<button {{on "click" (fn (mut this.x) 100)}} type="button">To the right</button>
+<button {{on "click" (fn (mut this.x) 250)}} type="button">To the right</button>
 
-<Motion @animate={{hash x=this.x}} style="height: 100px; width: 100px; background: red;">
-  Test
+<h3>Spring</h3>
+<p>Type "spring" simulates a damped harmonic oscilator. Various properties can be set to control the behaviour of the spring.</p>
+<Motion @animate={{hash x=this.x}} @transition={{hash type="spring" damping=50 allowsOverdamping=true}} style="height: 100px; width: 100px; background: red;">
+  overdamped spring
 </Motion>
+
+<Motion @animate={{hash x=this.x}} @transition={{hash type="spring"}} style="height: 100px; width: 100px; background: red;">
+  critically damped spring
+</Motion>
+
+<Motion @animate={{hash x=this.x}} @transition={{hash type="spring" damping=10}} style="height: 100px; width: 100px; background: red;">
+  underdamped spring
+</Motion>
+
+<h3>Tween</h3>
+<p>Type "tween" uses default Web Animation/CSS easings. A duration can also be set.</p>
+<Motion @animate={{hash x=this.x}} @transition={{hash type="tween" duration=1000}} style="height: 100px; width: 100px; background: red;">
+  linear
+</Motion>
+
+<Motion @animate={{hash x=this.x}} @transition={{hash type="tween" easing="ease-in-out" duration=1000}} style="height: 100px; width: 100px; background: red;">
+  ease-in-out
+</Motion>
+
+<h3>Entering/leaving animations</h3>
+<button {{on "click" (fn (mut this.show) true)}} type="button">show</button>
+<button {{on "click" (fn (mut this.show) false)}} type="button">hide</button>
+{{#if this.show}}
+  <Motion @initial={{hash x=-30}} @animate={{hash x=this.x}} @transition={{hash type="spring"}} style="height: 100px; width: 100px; background: red;">
+    spring
+  </Motion>
+{{/if}}
 
 {{outlet}}

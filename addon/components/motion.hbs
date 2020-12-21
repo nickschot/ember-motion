@@ -1,3 +1,7 @@
-<div {{did-insert this.setElement}} {{did-update this.animate @animate}} ...attributes>
+<div
+  {{did-insert this.onInsert}}
+  {{did-update this.onUpdate @animate}}
+  ...attributes
+>
   {{yield}}
 </div>
