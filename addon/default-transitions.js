@@ -39,7 +39,8 @@ const defaultTransitions = {
   color: linearTween,
   default: overDampedSpring,
 
-  borderColor: linearTween
+  borderColor: linearTween,
+  //borderRadius: linearTween
 }
 
 export const getDefaultTransition = (

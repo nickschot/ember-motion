@@ -152,8 +152,6 @@ export default function springToKeyframes(options) {
   };
 
   const {
-    fromValue,
-    toValue,
     stiffness,
     initialVelocity,
     restVelocityThreshold,
@@ -161,12 +159,27 @@ export default function springToKeyframes(options) {
     deltaTimeMs,
   } = config;
 
+  const fromValue = parseFloat(config.fromValue);
+  const toValue = parseFloat(config.toValue);
+
+  if (fromValue === toValue) {
+    throw new Error('From and to value are already identical');
+  }
+
+  if (isNaN(fromValue) || isNaN(toValue)) {
+    throw new Error(`Cannot calculate spring for non-numerical values: ${config.fromValue} -> ${config.toValue}`);
+  }
+
+  // TODO: debug only
+  const MAX_FRAMES = 1000;
+
   let frames = [];
   let time = 0;
   let value = fromValue;
   let velocity = initialVelocity;
-  while (!isSpringAtRest({stiffness, toValue, restDisplacementThreshold, restVelocityThreshold, value, velocity})) {
-    const frame = advanceSpringToTime(time, config);
+  const _config = { ...config, fromValue, toValue };
+  while (!isSpringAtRest({stiffness, toValue, restDisplacementThreshold, restVelocityThreshold, value, velocity}) && frames.length < MAX_FRAMES) {
+    const frame = advanceSpringToTime(time, _config);
     time += deltaTimeMs;
     value = frame.value;
     velocity = frame.velocity;

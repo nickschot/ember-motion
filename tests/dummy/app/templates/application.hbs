@@ -1,3 +1,5 @@
+{{!-- <MotionOrphans style="position: absolute; top: 0; left: 0;"/> --}}
+
 <h2 id="title">Welcome to Ember</h2>
 
 <button {{on "click" (fn (mut this.x) 0)}} type="button">To the left</button>
@@ -5,7 +7,15 @@
 
 <h3>Spring</h3>
 <p>Type "spring" simulates a damped harmonic oscilator. Various properties can be set to control the behaviour of the spring.</p>
-<Motion @animate={{hash x=this.x y=this.x}} style="height: 100px; width: 100px; background: red;">
+<Motion
+  @animate={{hash
+    x=this.x
+    y=this.y
+    backgroundColor=this.background
+    borderRadius=this.borderRadius
+  }}
+  style="height: 100px; width: 100px; margin-bottom: 200px;"
+>
   overdamped spring
 </Motion>
 {{!--
@@ -43,7 +53,7 @@
 <AnimateSharedLayout class="shared-layout">
   <ul>
     {{#each this.colors as |color|}}
-      <Motion @animate={{hash x=this.x2}} @transition={{hash type="tween" duration=1000}} class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}">
+      <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}">
         {{#if (eq color this.selected)}}
           <Motion
             @layoutId="outline"
@@ -51,12 +61,9 @@
             @initial={{false}}
             @animate={{hash borderColor=color}}
             style="border-color: {{color}}"
-            @transition={{hash type="tween"}}
           />
         {{/if}}
-      </Motion>
+      </li>
     {{/each}}
   </ul>
 </AnimateSharedLayout>
-
-{{!-- <MotionOrphans style="position: absolute; top: 0; left: 0;"/> --}}

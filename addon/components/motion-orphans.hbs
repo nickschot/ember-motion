@@ -1,0 +1,7 @@
+<div style="height: 0; width: 0; line-height: 0;" ...attributes>
+  {{#each this.motion.orphans as |orphan|}}
+    <Motion @animate={{orphan.animate}} @exit={{orphan.exit}} @orphan={{orphan}}>
+      {{{orphan.html}}}
+    </Motion>
+  {{/each}}
+</div>

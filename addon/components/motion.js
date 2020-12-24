@@ -1,10 +1,9 @@
 import Component from '@glimmer/component';
 import { action } from '@ember/object';
 import { task } from 'ember-concurrency';
-import { positionalValues } from '../util';
+import {copyComputedStyle, positionalValues, transformValues} from '../util';
 import springToKeyframes from '../spring';
 import { inject as service } from '@ember/service';
-import { htmlSafe } from '@ember/template';
 import { getDefaultTransition } from "../default-transitions";
 
 function isTransitionDefined({
@@ -51,7 +50,6 @@ export default class MotionComponent extends Component {
     }
 
     if (sharedLayoutGuid) {
-      console.log('setting shared layout component', sharedLayoutGuid);
       this.sharedLayout = this.motion.getSharedLayoutComponent(sharedLayoutGuid);
       this.sharedLayout.registerMotion(this);
     }
@@ -59,6 +57,10 @@ export default class MotionComponent extends Component {
     if (this.args.initial) {
       this.animate(element, {
         initial: this.args.initial,
+        animate: this.args.animate
+      });
+    } else {
+      this.animate(element, {
         animate: this.args.animate
       });
     }
@@ -69,20 +71,6 @@ export default class MotionComponent extends Component {
         exit: this.args.exit,
       });
     }
-  }
-
-  get styles() {
-    let styles = '';
-    console.log(this.args.orphan?.boundingBox);
-    if (this.args.orphan) {
-      const x = this.args.orphan.boundingBox.x + this.args.orphan.pageOffset.x;
-      const y = this.args.orphan.boundingBox.y + this.args.orphan.pageOffset.y;
-      styles = `position: absolute; left: ${x}px; top: ${y}px;`;
-    }
-
-    console.log(styles);
-
-    return htmlSafe(styles);
   }
 
   @action
@@ -134,106 +122,44 @@ export default class MotionComponent extends Component {
     });
   }
 
-  /*@(task(function*(element, { duration: _duration, initialVelocity, initialCssProps, cssProps, exitCssProps }){
-    try {
-    const styles = getComputedStyle(element);
-    this.boundingBox = this.element.getBoundingClientRect();
-
-    // TODO: make generic
-    let start = initialCssProps.borderColor;//initialCssProps ? initialCssProps.x : positionalValues['x'](this.boundingBox , styles);
-    let end = cssProps.borderColor;//cssProps.x;
-
-    if (this.args.orphan && exitCssProps) {
-      start = cssProps.x;
-      end = exitCssProps.x;
-    }
-
-    const {
-      // eslint-disable-next-line no-unused-vars
-      type: typeArg,
-      ...transitionOptions
-    } = this.args.transition ?? {};
-
-    let {
-      easing = 'linear',
-      fill = 'both'
-    } = transitionOptions;
-
-    let keyframes = [];
-    let duration = _duration;
-
-    if (this.type === 'spring') {
-      this.frames = springToKeyframes({
-        // critically damped by default
-        mass: 1,
-        stiffness: 100,
-        damping: 20,
-        ...transitionOptions,
-        fromValue: start,
-        toValue: end,
-        initialVelocity
-      });
-
-      // TODO: do this work in the springToKeyframes loop
-      // serialize generated frames into keyframes suitable for Web Animations
-      keyframes = this.frames.map(({ value }) => ({
-        transform: `translate(${value}px)`
-      }));
-      duration = this.frames[this.frames.length - 1]?.time;
-      easing = 'linear'; // force easing to be linear, which is the only sensible easing for a spring
-    } else if (this.type === 'tween') {
-      /!*keyframes = [
-        { transform: start },
-        { transform: `translate(${end}px)`}
-      ];*!/
-      keyframes = [
-        { borderColor: start },
-        { borderColor: end }
-      ];
-    }
-
-    // play the animation
-    this.animation = element.animate(keyframes, {
-      fill,
-      easing,
-      duration
-    });
-    this.animation.play();
-    yield this.animation.finished;
-
-    // cleanup
-    this.animation = null;
-    this.frames = null;
-
-    } finally {
-      console.log('set boundingbox');
-      this.boundingBox = this.element.getBoundingClientRect();
-      console.log('set boundingbox', this.boundingBox);
-      if (this.args.orphan) {
-        this.motion.removeOrphan(this.args.orphan);
-      }
-    }
-  }).restartable())
-  animateTask;
-*/
   @(task(function*({ element, initial, animate, exit, transition }) {
     try {
-      // TODO: make a copy of the properties we need
-      const styles = { transform: getComputedStyle(element)["transform"] };
-      console.log(styles);
+      const styles = copyComputedStyle(element);
+      this.styles = styles;
       this.boundingBox = this.element.getBoundingClientRect();
 
       const fromValues = initial ?? {};
       const toValues = exit ?? animate;
 
-      // TODO translate transform related properties (e.g. x, y => translate(x, y))
+      // TODO translate transform related properties (e.g. "x, y" => "translateX(x) translateY(y))")
+      // TODO put all transform related animations in a single animation so we don't need compositing
       // TODO take into account units
-      this.animations = Object.entries(toValues)
-        .map(([key, toValue], index) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition, index > 0 ? 'add' : 'replace'));
-      yield Promise.all(this.animations.map((a) => { a.persist(); return a.finished }));
+
+      const {
+        toValuesNormal,
+        toValuesTransform
+      } = Object.entries(toValues).reduce((result, [key, value]) => {
+        if (transformValues.includes(key)) {
+          result.toValuesTransform[key] = value;
+        } else {
+          result.toValuesNormal[key] = value;
+        }
+
+        return result;
+      }, {
+        toValuesNormal: {},
+        toValuesTransform: {}
+      });
+
+      this.animations = Object.entries(toValuesTransform).map(([key, toValue], index) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition, index > 0 ? 'add' : 'replace')).filter(Boolean);
+      this.animations = [...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
+      yield Promise.all(this.animations.map((a) => { if (a.persist) { a.persist(); } return a.finished }));
 
     } catch (error) {
       console.log('ERROR', error);
+    } finally {
+      this.styles = copyComputedStyle(element);
+      this.boundingClientRect = element.getBoundingClientRect();
     }
   }).restartable())
   animateAllTask;
@@ -241,10 +167,15 @@ export default class MotionComponent extends Component {
   @action
   getValueAnimation(element, styles, key, fromValue, toValue, transition, composite) {
     const options = {
-      fromValue: fromValue ?? positionalValues[key](this.boundingBox , styles),
+      fromValue: fromValue ?? positionalValues[key]?.(this.boundingBox , styles) ?? styles[key],
       toValue,
       initialVelocity: 0
     };
+
+    if (options.fromValue == options.toValue || (!isNaN(parseFloat(options.fromValue)) && parseFloat(options.fromValue) === parseFloat(options.toValue))) {
+      return null;
+    }
+
     const animation = isTransitionDefined(transition)
       ? { ...options, ...transition }
       : { ...options, ...getDefaultTransition(key, toValue)};
@@ -261,10 +192,7 @@ export default class MotionComponent extends Component {
         this.keyValueToCss(key, animation.fromValue),
         this.keyValueToCss(key, animation.toValue)
       ];
-      console.log(keyframes);
     }
-
-    console.log(animation);
 
     return element.animate(keyframes, {
       fill: "both",
@@ -277,6 +205,8 @@ export default class MotionComponent extends Component {
   keyValueToCss(key, value) {
     if (['x', 'y'].includes(key)) {
       return { transform: key === 'x' ? `translateX(${value}px)` : `translateY(${value}px)` }
+    } else if (typeof value === 'number') {
+      return { [key]: `${+value}px` };
     }
 
     return { [key]: value };
@@ -287,7 +217,7 @@ export default class MotionComponent extends Component {
     this.sharedLayout?.unregisterMotion(this);
 
     if(this.args.layoutId && this.sharedLayout) {
-      this.sharedLayout.notifyDestroying(this.args.layoutId, this.args.animate);
+      this.sharedLayout.notifyDestroying(this.args.layoutId, this.args.animate, this.boundingClientRect);
     }
 
     //console.log(this.element, this.element.getBoundingClientRect());
