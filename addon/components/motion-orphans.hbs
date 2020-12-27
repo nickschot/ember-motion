@@ -1,6 +1,6 @@
-<div style="height: 0; width: 0; line-height: 0;" ...attributes>
+<div style="height: 0; width: 0; line-height: 0;" {{did-insert this.onInsert}} ...attributes>
   {{#each this.motion.orphans as |orphan|}}
-    <Motion @animate={{orphan.animate}} @exit={{orphan.exit}} @orphan={{orphan}}>
+    <Motion @animate={{orphan.animate}} @exit={{orphan.exit}} @orphan={{orphan}} @orphanOffsetRect={{this.offsetRect}}>
       {{{orphan.html}}}
     </Motion>
   {{/each}}

@@ -2,7 +2,7 @@ import Component from '@glimmer/component';
 import { guidFor } from '@ember/object/internals';
 import { inject as service } from '@ember/service';
 import { action } from '@ember/object';
-import {getRelativeBoundingBox} from "../util";
+import { getRelativeOffsetRect } from '../util';
 
 export default class AnimateSharedLayoutComponent extends Component {
   @service motion;
@@ -42,14 +42,13 @@ export default class AnimateSharedLayoutComponent extends Component {
   @action
   notifyDestroying(layoutId, initialProps, boundingBox) {
     const motion = [...this.children].find((m) => m.args.layoutId === layoutId);
+    motion.animateAllTask.cancelAll();
 
     if (motion) {
-      const relativeDifference = getRelativeBoundingBox(motion.element.getBoundingClientRect(), boundingBox);
-
+      const offset = getRelativeOffsetRect(motion.element.getBoundingClientRect(), boundingBox);
       const initial = {
         ...initialProps,
-        x: relativeDifference.left,
-        y: relativeDifference.top
+        ...offset
       };
       const animate = {
         ...Object.entries(initial).reduce((result, [k, v]) => {

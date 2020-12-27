@@ -1,7 +1,12 @@
 import Component from '@glimmer/component';
 import { action } from '@ember/object';
 import { task } from 'ember-concurrency';
-import {copyComputedStyle, positionalValues, transformValues} from '../util';
+import {
+  copyComputedStyle,
+  getRelativeOffsetRect,
+  positionalValues,
+  transformValues
+} from '../util';
 import springToKeyframes from '../spring';
 import { inject as service } from '@ember/service';
 import { getDefaultTransition } from "../default-transitions";
@@ -29,6 +34,8 @@ export default class MotionComponent extends Component {
   animations = [];
   frames;
   sharedLayout;
+  computedStyles;
+  boundingClientRect;
 
   @action
   onInsert(element) {
@@ -59,16 +66,26 @@ export default class MotionComponent extends Component {
         initial: this.args.initial,
         animate: this.args.animate
       });
+    } else if (this.args.exit) {
+      if (!this.args.orphan) {
+        console.error('Cannot animate exit without a <MotionOrphans/> component');
+      }
+
+      const offset = getRelativeOffsetRect(this.args.orphanOffsetRect, this.args.orphan.boundingBox);
+      this.animate(element, {
+        animate: {
+          ...offset
+        },
+        exit: {
+          ...this.args.exit,
+          x: (this.args.exit.x ?? 0) + offset.x,
+          y: (this.args.exit.y ?? 0) + offset.y
+        },
+      });
     } else {
+      // FIXME this is the case for this.initial === false
       this.animate(element, {
         animate: this.args.animate
-      });
-    }
-
-    if (this.args.exit) {
-      this.animate(element, {
-        animate: this.args.animate,
-        exit: this.args.exit,
       });
     }
   }
@@ -86,7 +103,7 @@ export default class MotionComponent extends Component {
     /*let duration = this.duration;
     let initialVelocity = 0;
 
-    if (this.animation) {
+    if (this.animateAllTask.isRunning) {
       this.animation.pause();
       const timing = this.animation.effect.getComputedTiming();
       duration *= timing.progress;
@@ -107,10 +124,10 @@ export default class MotionComponent extends Component {
       initialVelocity
     });*/
 
-    if (this.animations?.length) {
+    /*if (this.animations?.length) {
       const paused = this.animations.map((animation) => { animation.pause(); return animation; });
       this.animations = [];
-    }
+    }*/
 
     this.animateAllTask.perform({
       element: this.element,
@@ -128,7 +145,7 @@ export default class MotionComponent extends Component {
       this.styles = styles;
       this.boundingBox = this.element.getBoundingClientRect();
 
-      const fromValues = initial ?? {};
+      const fromValues = initial ?? (this.args.orphan && exit ? animate : {});
       const toValues = exit ?? animate;
 
       // TODO translate transform related properties (e.g. "x, y" => "translateX(x) translateY(y))")
@@ -158,8 +175,9 @@ export default class MotionComponent extends Component {
     } catch (error) {
       console.log('ERROR', error);
     } finally {
-      this.styles = copyComputedStyle(element);
-      this.boundingClientRect = element.getBoundingClientRect();
+      if (this.args.orphan) {
+        this.motion.removeOrphan(this.args.orphan);
+      }
     }
   }).restartable())
   animateAllTask;
@@ -172,8 +190,17 @@ export default class MotionComponent extends Component {
       initialVelocity: 0
     };
 
+    // if the values are identical, apply an animation with a duration of 0 so we at least have the styles applied
     if (options.fromValue == options.toValue || (!isNaN(parseFloat(options.fromValue)) && parseFloat(options.fromValue) === parseFloat(options.toValue))) {
-      return null;
+      return element.animate([
+        this.keyValueToCss(key, options.fromValue),
+        this.keyValueToCss(key, options.toValue)
+      ], {
+        fill: "both",
+        easing: "linear",
+        duration: 0,
+        composite
+      })
     }
 
     const animation = isTransitionDefined(transition)
@@ -205,38 +232,55 @@ export default class MotionComponent extends Component {
   keyValueToCss(key, value) {
     if (['x', 'y'].includes(key)) {
       return { transform: key === 'x' ? `translateX(${value}px)` : `translateY(${value}px)` }
-    } else if (typeof value === 'number') {
+    } else if (typeof value === 'number' && !['opacity'].includes(key)) {
       return { [key]: `${+value}px` };
     }
 
     return { [key]: value };
   }
 
-  willDestroy() {
-    // unregister first so we're sure we won't match against ourselves when matching layoutId
-    this.sharedLayout?.unregisterMotion(this);
-
-    if(this.args.layoutId && this.sharedLayout) {
-      this.sharedLayout.notifyDestroying(this.args.layoutId, this.args.animate, this.boundingClientRect);
+  /**
+   * Action that handles tasks we need to do in a synchronous willDestroyElement hook.
+   * @param element
+   */
+  @action
+  onWillDestroyElement(element) {
+    if (this.animateAllTask.isRunning) {
+      this.animateAllTask.cancelAll();
     }
 
-    //console.log(this.element, this.element.getBoundingClientRect());
-    //debugger;
-    if (!this.args.orphan && this.element && this.args.exit) {
-      const html = this.element.cloneNode(true);
+    this.boundingClientRect = element.getBoundingClientRect();
+    this.computedStyles = copyComputedStyle(element);
 
+    if (!this.args.orphan && this.args.exit) {
       this.motion.addOrphan({
-        html,
-        pageOffset: {
-          x: window.pageXOffset,
-          y: window.pageYOffset
+        html: element.cloneNode(true),
+        boundingBox: {
+          x: window.pageXOffset + this.boundingClientRect.x,
+          y: window.pageYOffset + this.boundingClientRect.y
         },
-        boundingBox: this.boundingBox,
         transition: this.args.transition,
-        animate: this.args.animate,
+        animate: this.computedStyles,
         exit: this.args.exit
       });
     }
+  }
+
+  willDestroy() {
+    if (!this.args.orphan) {
+      // unregister first so we're sure we won't match against ourselves when matching layoutId
+      this.sharedLayout?.unregisterMotion(this);
+
+      if(this.args.layoutId && this.sharedLayout) {
+        this.sharedLayout.notifyDestroying(this.args.layoutId, {
+          ...this.args.animate,
+          x: positionalValues['x']?.(this.boundingClientRect , this.computedStyles),
+          y: positionalValues['y']?.(this.boundingClientRect , this.computedStyles),
+          borderColor: this.computedStyles.borderColor
+        }, this.boundingClientRect);
+      }
+    }
+
     super.willDestroy();
   }
 }

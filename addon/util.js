@@ -89,11 +89,21 @@ export const COPIED_CSS_PROPERTIES = [
   'transform'
 ];
 
-export function getRelativeBoundingBox(parentBoundingBox, childBoundingBox) {
+export function getRelativeBoundingBox(a, b) {
   return {
-    top: childBoundingBox.top - parentBoundingBox.top,
-    right: childBoundingBox.right - parentBoundingBox.right,
-    bottom: childBoundingBox.bottom - parentBoundingBox.bottom,
-    left: childBoundingBox.left - parentBoundingBox.left,
+    ...getRelativeOffsetRect(a, b),
+    width: b.width - a.width,
+    height: b.height - a.height,
+    top: b.top - a.top,
+    right: b.right - a.right,
+    bottom: b.bottom - a.bottom,
+    left: b.left - a.left,
+  };
+}
+
+export function getRelativeOffsetRect(a, b) {
+  return {
+    x: b.x - a.x,
+    y: b.y - a.y,
   };
 }

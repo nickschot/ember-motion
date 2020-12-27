@@ -14,11 +14,11 @@
     backgroundColor=this.background
     borderRadius=this.borderRadius
   }}
-  style="height: 100px; width: 100px; margin-bottom: 200px;"
+  style="height: 100px; width: 100px; margin-bottom: 15px;"
 >
   overdamped spring
 </Motion>
-{{!--
+
 <Motion @animate={{hash x=this.x}} @transition={{hash type="spring"}} style="height: 100px; width: 100px; background: red;">
   critically damped spring
 </Motion>
@@ -41,11 +41,16 @@
 <button {{on "click" (fn (mut this.show) true)}} type="button">show</button>
 <button {{on "click" (fn (mut this.show) false)}} type="button">hide</button>
 {{#if this.show}}
-  <Motion @initial={{hash x=-30}} @animate={{hash x=this.x}} @exit={{hash x=-30}} @transition={{hash type="spring"}} style="height: 100px; width: 100px; background: red;">
+  <Motion
+    @initial={{hash x=-30 opacity=0 }}
+    @animate={{hash x=this.x opacity=1}}
+    @exit={{hash x=50 opacity=0}}
+    @transition={{hash type="spring"}}
+    style="height: 100px; width: 100px; background: red;"
+  >
     spring
   </Motion>
 {{/if}}
---}}
 
 {{outlet}}
 
@@ -67,3 +72,5 @@
     {{/each}}
   </ul>
 </AnimateSharedLayout>
+
+<MotionOrphans style="position: absolute; top: 0; left: 0;"/>

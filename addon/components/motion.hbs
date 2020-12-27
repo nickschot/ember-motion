@@ -1,7 +1,8 @@
-<div
+<Motion::Element
+  ...attributes
   {{did-insert this.onInsert}}
   {{did-update this.onUpdate @animate}}
-  ...attributes
+  @onWillDestroyElement={{this.onWillDestroyElement}}
 >
   {{yield}}
-</div>
+</Motion::Element>
