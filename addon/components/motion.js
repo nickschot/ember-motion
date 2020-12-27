@@ -10,6 +10,7 @@ import {
 import springToKeyframes from '../spring';
 import { inject as service } from '@ember/service';
 import { getDefaultTransition } from "../default-transitions";
+import Transform, {cumulativeTransform, ownTransform} from "../transform";
 
 function isTransitionDefined({
   when,
@@ -61,7 +62,45 @@ export default class MotionComponent extends Component {
       this.sharedLayout.registerMotion(this);
     }
 
-    if (this.args.initial) {
+    if (this.sharedLayout?.outGoing.has(this.args.layoutId)) {
+      const {
+        boundingBox,
+        initialProps,
+        sourceCumulativeTransform
+      } = this.sharedLayout.outGoing.get(this.args.layoutId);
+      this.sharedLayout.outGoing.delete(this.args.layoutId);
+
+      const sourceMatrix = sourceCumulativeTransform;
+      const targetMatrix = cumulativeTransform(this.element);
+      const offset = getRelativeOffsetRect(this.element.getBoundingClientRect(), boundingBox);
+
+      const scaleX = sourceMatrix.a / targetMatrix.a;
+      const scaleY = sourceMatrix.d / targetMatrix.d;
+
+      const x = offset.x / targetMatrix.a;
+      const y = offset.y / targetMatrix.a;
+
+      const initial = {
+        ...initialProps,
+        x,
+        y,
+        scaleX,
+        scaleY
+      };
+
+      const animate = {
+        ...Object.entries(initial).reduce((result, [k, v]) => {
+          // TODO: set appropriate default value for type
+          result[k] = 0;
+          return result;
+        }, {}),
+        scaleX: 1,
+        scaleY: 1,
+        ...this.args.animate,
+      };
+
+      this.animate(null, { initial, animate });
+    } else if (this.args.initial) {
       this.animate(element, {
         initial: this.args.initial,
         animate: this.args.animate
@@ -114,20 +153,7 @@ export default class MotionComponent extends Component {
       }
     }*/
 
-    //console.log('animating', initial, animate, exit, duration, initialVelocity);
-
-    /*this.animateTask.perform(this.element, {
-      initialCssProps: initial,
-      cssProps: animate,
-      exitCssProps: exit,
-      duration,
-      initialVelocity
-    });*/
-
-    /*if (this.animations?.length) {
-      const paused = this.animations.map((animation) => { animation.pause(); return animation; });
-      this.animations = [];
-    }*/
+    //console.log(ownTransform(this.element), cumulativeTransform(this.element));
 
     this.animateAllTask.perform({
       element: this.element,
@@ -154,10 +180,15 @@ export default class MotionComponent extends Component {
 
       const {
         toValuesNormal,
-        toValuesTransform
+        toValuesTransform,
+        fromValuesTransform
       } = Object.entries(toValues).reduce((result, [key, value]) => {
         if (transformValues.includes(key)) {
           result.toValuesTransform[key] = value;
+
+          if (fromValues[key]) {
+            result.fromValuesTransform[key] = fromValues[key];
+          }
         } else {
           result.toValuesNormal[key] = value;
         }
@@ -165,11 +196,20 @@ export default class MotionComponent extends Component {
         return result;
       }, {
         toValuesNormal: {},
-        toValuesTransform: {}
+        toValuesTransform: {},
+        fromValuesTransform: {}
       });
 
-      this.animations = Object.entries(toValuesTransform).map(([key, toValue], index) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition, index > 0 ? 'add' : 'replace')).filter(Boolean);
-      this.animations = [...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
+      const fromTransform = ownTransform(element);
+      const transformAnimation = this.getTransformAnimation(element, toValuesTransform, {
+        x: fromTransform.tx,
+        y: fromTransform.ty,
+        scaleX: fromTransform.a,
+        scaleY: fromTransform.d,
+        // TODO: skew
+        ...fromValuesTransform
+      });
+      this.animations = [transformAnimation, ...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
       yield Promise.all(this.animations.map((a) => { if (a.persist) { a.persist(); } return a.finished }));
 
     } catch (error) {
@@ -181,6 +221,71 @@ export default class MotionComponent extends Component {
     }
   }).restartable())
   animateAllTask;
+
+  @action
+  getTransformAnimation(element, toValues, fromValues) {
+    // TODO: abstract
+    // TODO: rotate/skew
+    let scaleX = fromValues['scaleX'] ?? fromValues['scale'] ?? 1;
+    let scaleY = fromValues['scaleY'] ?? fromValues['scale'] ?? 1;
+    let skewX = 0;
+    let skewY = 0;
+    let translateX = fromValues['x'] ?? 0;
+    let translateY = fromValues['y'] ?? 0;
+    const fromMatrix = (new Transform(scaleX, skewY, skewX, scaleY, translateX, translateY));
+
+    const springFrom = Math.sqrt(Math.pow(fromMatrix.tx, 2) + Math.pow(fromMatrix.ty, 2));
+
+    scaleX = toValues['scaleX'] ?? toValues['scale'] ?? 1;
+    scaleY = toValues['scaleY'] ?? toValues['scale'] ?? 1;
+    skewX = 0;
+    skewY = 0;
+    translateX = toValues['x'] ?? 0;
+    translateY = toValues['y'] ?? 0;
+    const toMatrix = new Transform(scaleX, skewY, skewX, scaleY, translateX, translateY);
+
+    const springTo = Math.sqrt(Math.pow(toMatrix.tx, 2) + Math.pow(toMatrix.ty, 2));
+    if (fromMatrix.serialize() === toMatrix.serialize()) {
+      return element.animate([
+        {
+          transform: toMatrix.serialize()
+        },
+        {
+          transform: toMatrix.serialize()
+        }
+      ], {
+        fill: "both",
+        easing: "linear",
+        duration: 0,
+        composite: "replace"
+      });
+    }
+
+    console.log(this.args.transition);
+
+    const frames = springToKeyframes({
+      fromValue: 0,
+      initialVelocity: 0,
+      ...getDefaultTransition('x', springTo - springFrom),
+      ...(this.args.transition?.type === "spring" ? this.args.transition : undefined),
+    });
+
+    const keyframes = frames.map(({ value }) => {
+      const scalar = value / (springTo - springFrom);
+      const diff = toMatrix.subtract(fromMatrix);
+      const matrixForFrame = fromMatrix.add(diff.scalar(scalar));
+      return {
+        transform: matrixForFrame.serialize()
+      };
+    });
+
+    return element.animate(keyframes, {
+      fill: "both",
+      easing: "linear",
+      duration: frames[frames.length - 1].time,
+      composite: "replace"
+    });
+  }
 
   @action
   getValueAnimation(element, styles, key, fromValue, toValue, transition, composite) {
@@ -230,10 +335,12 @@ export default class MotionComponent extends Component {
   }
 
   keyValueToCss(key, value) {
-    if (['x', 'y'].includes(key)) {
+    /*if (['x', 'y'].includes(key)) {
       return { transform: key === 'x' ? `translateX(${value}px)` : `translateY(${value}px)` }
-    } else if (typeof value === 'number' && !['opacity'].includes(key)) {
-      return { [key]: `${+value}px` };
+    } else if(['scaleX', 'scaleY'].includes(key)) {
+      return { transform: key === 'scaleX' ? `scaleX(${value})` : `scaleY(${value})`}
+    } else*/ if (typeof value === 'number' && !['opacity'].includes(key)) {
+      return { [key]: `${parseFloat(value)}px` };
     }
 
     return { [key]: value };
@@ -251,6 +358,7 @@ export default class MotionComponent extends Component {
 
     this.boundingClientRect = element.getBoundingClientRect();
     this.computedStyles = copyComputedStyle(element);
+    this.cumulativeTransform = cumulativeTransform(element);
 
     if (!this.args.orphan && this.args.exit) {
       this.motion.addOrphan({
@@ -264,9 +372,7 @@ export default class MotionComponent extends Component {
         exit: this.args.exit
       });
     }
-  }
 
-  willDestroy() {
     if (!this.args.orphan) {
       // unregister first so we're sure we won't match against ourselves when matching layoutId
       this.sharedLayout?.unregisterMotion(this);
@@ -277,9 +383,13 @@ export default class MotionComponent extends Component {
           x: positionalValues['x']?.(this.boundingClientRect , this.computedStyles),
           y: positionalValues['y']?.(this.boundingClientRect , this.computedStyles),
           borderColor: this.computedStyles.borderColor
-        }, this.boundingClientRect);
+        }, this.boundingClientRect, this.cumulativeTransform);
       }
     }
+  }
+
+  willDestroy() {
+
 
     super.willDestroy();
   }

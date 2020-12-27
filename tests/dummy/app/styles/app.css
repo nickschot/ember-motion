@@ -33,7 +33,9 @@ ul {
 }
 
 .item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100px;
   height: 100px;
   border-radius: 50%;
@@ -51,4 +53,5 @@ ul {
   bottom: -20px;
   border: 10px solid white;
   border-radius: 50%;
+  transform-origin: 0 0!important; /* TODO: handle in code */
 }

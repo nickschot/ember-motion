@@ -2,7 +2,6 @@ import Component from '@glimmer/component';
 import { guidFor } from '@ember/object/internals';
 import { inject as service } from '@ember/service';
 import { action } from '@ember/object';
-import { getRelativeOffsetRect } from '../util';
 
 export default class AnimateSharedLayoutComponent extends Component {
   @service motion;
@@ -10,6 +9,7 @@ export default class AnimateSharedLayoutComponent extends Component {
   guid = guidFor(this);
   children = new Set(); // TODO: layoutId's must be unique among the motions registered here
   element;
+  outGoing = new Map();
 
   constructor() {
     super(...arguments);
@@ -40,26 +40,7 @@ export default class AnimateSharedLayoutComponent extends Component {
   }
 
   @action
-  notifyDestroying(layoutId, initialProps, boundingBox) {
-    const motion = [...this.children].find((m) => m.args.layoutId === layoutId);
-    motion.animateAllTask.cancelAll();
-
-    if (motion) {
-      const offset = getRelativeOffsetRect(motion.element.getBoundingClientRect(), boundingBox);
-      const initial = {
-        ...initialProps,
-        ...offset
-      };
-      const animate = {
-        ...Object.entries(initial).reduce((result, [k, v]) => {
-          // TODO: set appropriate default value for type
-          result[k] = 0;
-          return result;
-        }, {}),
-        ...motion.args.animate
-      };
-
-      motion.animate(null, { initial, animate });
-    }
+  notifyDestroying(layoutId, initialProps, boundingBox, sourceCumulativeTransform) {
+    this.outGoing.set(layoutId, { initialProps, boundingBox, sourceCumulativeTransform });
   }
 }

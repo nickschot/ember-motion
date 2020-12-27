@@ -10,7 +10,6 @@
 <Motion
   @animate={{hash
     x=this.x
-    y=this.y
     backgroundColor=this.background
     borderRadius=this.borderRadius
   }}
@@ -19,7 +18,7 @@
   overdamped spring
 </Motion>
 
-<Motion @animate={{hash x=this.x}} @transition={{hash type="spring"}} style="height: 100px; width: 100px; background: red;">
+<Motion @animate={{hash x=this.x}} @transition={{hash type="spring" damping=25}} style="height: 100px; width: 100px; background: red;">
   critically damped spring
 </Motion>
 
@@ -57,18 +56,48 @@
 
 <AnimateSharedLayout class="shared-layout">
   <ul>
-    {{#each this.colors as |color|}}
-      <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}">
-        {{#if (eq color this.selected)}}
-          <Motion
-            @layoutId="outline"
-            class="outline"
-            @initial={{false}}
-            @animate={{hash borderColor=color}}
-            style="border-color: {{color}}"
-          />
-        {{/if}}
-      </li>
+    {{#each this.colors as |color index|}}
+      {{#if (eq index 0)}}
+        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scale(0.5);">
+          {{#if (eq color this.selected)}}
+            <Motion
+              @layoutId="outline"
+              class="outline"
+              @initial={{false}}
+              @animate={{hash borderColor=color}}
+              style="border-color: {{color}}"
+            />
+          {{/if}}
+          scale 0.5
+        </li>
+      {{else if (eq index 1)}}
+        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scale(1.25);">
+          {{#if (eq color this.selected)}}
+            <Motion
+              @layoutId="outline"
+              class="outline"
+              @initial={{false}}
+              @animate={{hash borderColor=color}}
+              style="border-color: {{color}}"
+            />
+          {{/if}}
+          scale 1.25
+        </li>
+      {{else}}
+        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}">
+          {{#if (eq color this.selected)}}
+            <Motion
+              @layoutId="outline"
+              class="outline"
+              @initial={{false}}
+              @animate={{hash borderColor=color}}
+              style="border-color: {{color}}"
+            />
+          {{/if}}
+          scale 1
+        </li>
+      {{/if}}
+
     {{/each}}
   </ul>
 </AnimateSharedLayout>
