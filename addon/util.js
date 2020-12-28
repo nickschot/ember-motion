@@ -49,6 +49,8 @@ export const transformValues = [
   'scaleX',
   'scaleY',
   'scale',
+  'skewX',
+  'skewY'
 ];
 
 export function copyComputedStyle(element) {

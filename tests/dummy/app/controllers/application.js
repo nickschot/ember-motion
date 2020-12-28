@@ -12,6 +12,9 @@ export default class ApplicationController extends Controller {
   get borderRadius() {
     return this.x / 10;
   }
+  get rotate() {
+    return this.x > 0 ? 30 : 0;
+  }
   @tracked colors = ["#ff0055", "#0099ff", "#22cc88", "#ffaa00"];
   @tracked selected = this.colors[0];
 }

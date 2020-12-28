@@ -10,7 +10,9 @@ import {
 import springToKeyframes from '../spring';
 import { inject as service } from '@ember/service';
 import { getDefaultTransition } from "../default-transitions";
-import Transform, {cumulativeTransform, ownTransform} from "../transform";
+import Transform, {cumulativeTransform, parseTransform} from "../transform";
+import {serializeValuesAsTransform} from "../transform-utils";
+import MatrixMath from '../matrix-math';
 
 function isTransitionDefined({
   when,
@@ -25,6 +27,14 @@ function isTransitionDefined({
   ...transition
 }) {
   return !!Object.keys(transition).length
+}
+
+export function toDegrees (angle) {
+  return angle * (180 / Math.PI);
+}
+
+export function toRadians (angle) {
+  return angle * (Math.PI / 180);
 }
 
 export default class MotionComponent extends Component {
@@ -78,7 +88,7 @@ export default class MotionComponent extends Component {
       const scaleY = sourceMatrix.d / targetMatrix.d;
 
       const x = offset.x / targetMatrix.a;
-      const y = offset.y / targetMatrix.a;
+      const y = offset.y / targetMatrix.d;
 
       const initial = {
         ...initialProps,
@@ -200,17 +210,26 @@ export default class MotionComponent extends Component {
         fromValuesTransform: {}
       });
 
-      const fromTransform = ownTransform(element);
+      const fromTransform = parseTransform(styles.transform);//ownTransform(element);
+      const decomposed3d = MatrixMath.decomposeMatrix([
+        fromTransform.a, fromTransform.b, 0, 0,
+        fromTransform.c, fromTransform.d, 0, 0,
+        0, 0, 1, 0,
+        fromTransform.tx, fromTransform.ty, 0, 1
+      ]);
+
       const transformAnimation = this.getTransformAnimation(element, toValuesTransform, {
-        x: fromTransform.tx,
-        y: fromTransform.ty,
-        scaleX: fromTransform.a,
-        scaleY: fromTransform.d,
-        // TODO: skew
+        x: decomposed3d.translateX,
+        y: decomposed3d.translateY,
+        scaleX: decomposed3d.scaleX,
+        scaleY: decomposed3d.scaleY,
+        rotate: decomposed3d.rotate,
+        skewX: decomposed3d.skewX,
+        skewY: decomposed3d.skewY,
         ...fromValuesTransform
       });
       this.animations = [transformAnimation, ...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
-      yield Promise.all(this.animations.map((a) => { if (a.persist) { a.persist(); } return a.finished }));
+      yield Promise.all(this.animations.map((a) => { /*if (a.persist) { a.persist(); }*/ return a.finished }));
 
     } catch (error) {
       console.log('ERROR', error);
@@ -224,34 +243,20 @@ export default class MotionComponent extends Component {
 
   @action
   getTransformAnimation(element, toValues, fromValues) {
-    // TODO: abstract
-    // TODO: rotate/skew
-    let scaleX = fromValues['scaleX'] ?? fromValues['scale'] ?? 1;
-    let scaleY = fromValues['scaleY'] ?? fromValues['scale'] ?? 1;
-    let skewX = 0;
-    let skewY = 0;
-    let translateX = fromValues['x'] ?? 0;
-    let translateY = fromValues['y'] ?? 0;
-    const fromMatrix = (new Transform(scaleX, skewY, skewX, scaleY, translateX, translateY));
+    // TODO: what if we don't have x/y ???
+    let springFrom = Math.sqrt(Math.pow(fromValues.x ?? 0, 2) + Math.pow(fromValues.y ?? 0, 2));
+    let springTo = Math.sqrt(Math.pow(toValues.x ?? 0, 2) + Math.pow(toValues.y ?? 0, 2));
 
-    const springFrom = Math.sqrt(Math.pow(fromMatrix.tx, 2) + Math.pow(fromMatrix.ty, 2));
+    const fromTransformString = serializeValuesAsTransform(fromValues);
+    const toTransformString = serializeValuesAsTransform(toValues);
 
-    scaleX = toValues['scaleX'] ?? toValues['scale'] ?? 1;
-    scaleY = toValues['scaleY'] ?? toValues['scale'] ?? 1;
-    skewX = 0;
-    skewY = 0;
-    translateX = toValues['x'] ?? 0;
-    translateY = toValues['y'] ?? 0;
-    const toMatrix = new Transform(scaleX, skewY, skewX, scaleY, translateX, translateY);
-
-    const springTo = Math.sqrt(Math.pow(toMatrix.tx, 2) + Math.pow(toMatrix.ty, 2));
-    if (fromMatrix.serialize() === toMatrix.serialize()) {
+    if (fromTransformString === toTransformString || (springFrom === 0 && springTo === springFrom)) {
       return element.animate([
         {
-          transform: toMatrix.serialize()
+          transform: fromTransformString
         },
         {
-          transform: toMatrix.serialize()
+          transform: toTransformString
         }
       ], {
         fill: "both",
@@ -261,8 +266,7 @@ export default class MotionComponent extends Component {
       });
     }
 
-    console.log(this.args.transition);
-
+    // TODO: add tween support
     const frames = springToKeyframes({
       fromValue: 0,
       initialVelocity: 0,
@@ -270,12 +274,17 @@ export default class MotionComponent extends Component {
       ...(this.args.transition?.type === "spring" ? this.args.transition : undefined),
     });
 
+    // TODO: implement this as a callback in the spring so we can save doing this map operation
     const keyframes = frames.map(({ value }) => {
       const scalar = value / (springTo - springFrom);
-      const diff = toMatrix.subtract(fromMatrix);
-      const matrixForFrame = fromMatrix.add(diff.scalar(scalar));
+      const frame = Object.fromEntries(
+        Object
+          .entries(toValues)
+          .map(([key, toValue]) => [key, (fromValues[key] ?? 0) + scalar * (toValue - (fromValues[key] ?? 0))])
+      );
+
       return {
-        transform: matrixForFrame.serialize()
+        transform: serializeValuesAsTransform(frame)
       };
     });
 
@@ -335,11 +344,7 @@ export default class MotionComponent extends Component {
   }
 
   keyValueToCss(key, value) {
-    /*if (['x', 'y'].includes(key)) {
-      return { transform: key === 'x' ? `translateX(${value}px)` : `translateY(${value}px)` }
-    } else if(['scaleX', 'scaleY'].includes(key)) {
-      return { transform: key === 'scaleX' ? `scaleX(${value})` : `scaleY(${value})`}
-    } else*/ if (typeof value === 'number' && !['opacity'].includes(key)) {
+    if (typeof value === 'number' && !['opacity'].includes(key)) {
       return { [key]: `${parseFloat(value)}px` };
     }
 
@@ -386,11 +391,5 @@ export default class MotionComponent extends Component {
         }, this.boundingClientRect, this.cumulativeTransform);
       }
     }
-  }
-
-  willDestroy() {
-
-
-    super.willDestroy();
   }
 }

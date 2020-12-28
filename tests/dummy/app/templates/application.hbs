@@ -15,15 +15,19 @@
   }}
   style="height: 100px; width: 100px; margin-bottom: 15px;"
 >
-  overdamped spring
+  default spring
 </Motion>
 
-<Motion @animate={{hash x=this.x}} @transition={{hash type="spring" damping=25}} style="height: 100px; width: 100px; background: red;">
+<Motion @animate={{hash x=this.x rotate=this.rotate skewX=-10}} @transition={{hash type="spring" damping=25}} style="height: 100px; width: 100px; background: red;">
   critically damped spring
 </Motion>
 
 <Motion @animate={{hash x=this.x}} @transition={{hash type="spring" damping=10}} style="height: 100px; width: 100px; background: red;">
   underdamped spring
+</Motion>
+
+<Motion @animate={{hash x=this.x}} @transition={{hash type="spring" damping=50 allowsOverdamping=true}} style="height: 100px; width: 100px; background: red;">
+  overdamped spring
 </Motion>
 
 <h3>Tween</h3>

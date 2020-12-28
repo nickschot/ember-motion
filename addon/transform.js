@@ -111,7 +111,7 @@ export const identity = new Transform(1, 0, 0, 1, 0, 0);
 
 const matrixPattern = /matrix\((.*)\)/;
 
-function parseTransform(matrixString) {
+export function parseTransform(matrixString) {
   let match = matrixPattern.exec(matrixString);
   if (!match) {
     return identity;
@@ -168,7 +168,7 @@ export function ownTransform(elt) {
     return identity;
   }
   let matrix = parseTransform(t);
-  if (matrix.a !== 1 || matrix.b !== 0 || matrix.c !== 0 || matrix.d !== 1) {
+  /*if (matrix.a !== 1 || matrix.b !== 0 || matrix.c !== 0 || matrix.d !== 1) {
     // If there is any rotation, scaling, or skew we need to do it within the context of transform-origin.
     let origin =
       eltStyles.getPropertyValue('transform-origin') !== ''
@@ -183,8 +183,8 @@ export function ownTransform(elt) {
     return new Transform(1, 0, 0, 1, originX, originY)
       .mult(matrix)
       .mult(new Transform(1, 0, 0, 1, -originX, -originY));
-  } else {
+  } else {*/
     // This case is an optimization for when there is only translation.
     return matrix;
-  }
+  //}
 }
