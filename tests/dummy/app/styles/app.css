@@ -52,6 +52,6 @@ ul {
   right: -20px;
   bottom: -20px;
   border: 10px solid white;
-  border-radius: 50%;
-  transform-origin: 0 0!important; /* TODO: handle in code */
+  /*border-radius: 50%;*/
+  /*transform-origin: 0 0!important;*/ /* TODO: handle in code */
 }

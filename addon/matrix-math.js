@@ -558,7 +558,6 @@ const MatrixMath = {
    * http://tog.acm.org/resources/GraphicsGems/gemsii/unmatrix.c
    */
   decomposeMatrix(transformMatrix) {
-    console.log('DECOMPOSING: ', transformMatrix);
     /*invariant(
       transformMatrix.length === 16,
       'Matrix decomposition needs a list of 3d matrix values, received %s',
@@ -732,9 +731,9 @@ const MatrixMath = {
       translateX: translation[0],
       translateY: translation[1],
 
-      skewX: skew[0] * 180/Math.PI,
-      skewY: skew[1] * 180/Math.PI,
-      skewZ: skew[2] * 180/Math.PI,
+      skewX: Math.atan(skew[0]) * 180/Math.PI,
+      skewY: Math.atan(skew[1]) * 180/Math.PI,
+      skewZ: Math.atan(skew[2]) * 180/Math.PI,
     };
   },
 };

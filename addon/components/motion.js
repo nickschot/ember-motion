@@ -1,6 +1,6 @@
 import Component from '@glimmer/component';
 import { action } from '@ember/object';
-import { task } from 'ember-concurrency';
+import { task, all } from 'ember-concurrency';
 import {
   copyComputedStyle,
   getRelativeOffsetRect,
@@ -10,7 +10,7 @@ import {
 import springToKeyframes from '../spring';
 import { inject as service } from '@ember/service';
 import { getDefaultTransition } from "../default-transitions";
-import Transform, {cumulativeTransform, parseTransform} from "../transform";
+import { cumulativeTransform, parseTransform } from "../transform";
 import {serializeValuesAsTransform} from "../transform-utils";
 import MatrixMath from '../matrix-math';
 
@@ -74,28 +74,81 @@ export default class MotionComponent extends Component {
 
     if (this.sharedLayout?.outGoing.has(this.args.layoutId)) {
       const {
-        boundingBox,
+        boundingBox: sourceBoundingClientRect,
         initialProps,
-        sourceCumulativeTransform
+        sourceCumulativeTransform: sourceMatrix,
+        //styles
       } = this.sharedLayout.outGoing.get(this.args.layoutId);
       this.sharedLayout.outGoing.delete(this.args.layoutId);
 
-      const sourceMatrix = sourceCumulativeTransform;
       const targetMatrix = cumulativeTransform(this.element);
-      const offset = getRelativeOffsetRect(this.element.getBoundingClientRect(), boundingBox);
+      const targetBoundingClientRect = this.element.getBoundingClientRect();
 
-      const scaleX = sourceMatrix.a / targetMatrix.a;
-      const scaleY = sourceMatrix.d / targetMatrix.d;
+      const sourceMatrix_4x4 = [
+        sourceMatrix.a, sourceMatrix.b, 0, 0,
+        sourceMatrix.c, sourceMatrix.d, 0, 0,
+        0, 0, 1, 0,
+        sourceMatrix.tx, sourceMatrix.ty, 0, 1
+      ];
+      const targetMatrix_4x4 = [
+        targetMatrix.a, targetMatrix.b, 0, 0,
+        targetMatrix.c, targetMatrix.d, 0, 0,
+        0, 0, 1, 0,
+        targetMatrix.tx, targetMatrix.ty, 0, 1
+      ];
 
-      const x = offset.x / targetMatrix.a;
-      const y = offset.y / targetMatrix.d;
+      const decomposedSourceMatrix = MatrixMath.decomposeMatrix(sourceMatrix_4x4);
+      const decomposedTargetMatrix = MatrixMath.decomposeMatrix(targetMatrix_4x4);
+
+      const scaleX = decomposedSourceMatrix.scaleX / decomposedTargetMatrix.scaleX;
+      const scaleY = decomposedSourceMatrix.scaleY / decomposedTargetMatrix.scaleY;
+
+      const skewX = decomposedSourceMatrix.skewX - decomposedTargetMatrix.skewX;
+      const skewY = decomposedSourceMatrix.skewY - decomposedTargetMatrix.skewY;
+
+      const rotate = decomposedSourceMatrix.rotate - decomposedTargetMatrix.rotate;
+
+      // X/Y should be the diff between the source transform origin & target transform origin
+      let x = (sourceBoundingClientRect.x + sourceBoundingClientRect.width / 2) - (targetBoundingClientRect.x + targetBoundingClientRect.width / 2);
+      let y = (sourceBoundingClientRect.y + sourceBoundingClientRect.height / 2) - (targetBoundingClientRect.y + targetBoundingClientRect.height / 2);
+
+      // scale correction
+      x /= decomposedTargetMatrix.scaleX;
+      y /= decomposedTargetMatrix.scaleY;
+
+      // rotation correction
+      const rotate_rad = -1 * toRadians(decomposedTargetMatrix.rotate);
+
+      // compensate for translateY based on rotation
+      let y_d1 = y - Math.cos(rotate_rad) * y;
+      let x_d1 = Math.sin(rotate_rad) * y;
+
+      // compensate for translateX based on rotation
+      let x_d2 = x - Math.cos(rotate_rad) * x;
+      let y_d2 = Math.sin(rotate_rad) * x;
+
+      x -= x_d1;
+      y -= y_d1;
+      x -= x_d2;
+      y += y_d2;
+
+      // skew correction
+      let x_delta = Math.tan(toRadians(decomposedTargetMatrix.skewX)) * y;
+      let y_delta = Math.tan(toRadians(decomposedTargetMatrix.skewY)) * x;
+      console.log(rotate, 'DELTA', x_delta, y_delta, decomposedTargetMatrix.skewX, decomposedTargetMatrix.skewY);
+
+      x -= x_delta;
+      y -= y_delta;
 
       const initial = {
         ...initialProps,
         x,
         y,
         scaleX,
-        scaleY
+        scaleY,
+        rotate,
+        skewX,
+        skewY
       };
 
       const animate = {
@@ -229,7 +282,7 @@ export default class MotionComponent extends Component {
         ...fromValuesTransform
       });
       this.animations = [transformAnimation, ...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
-      yield Promise.all(this.animations.map((a) => { /*if (a.persist) { a.persist(); }*/ return a.finished }));
+      yield all(this.animations.map((a) => { /*if (a.persist) { a.persist(); }*/ return a.finished }));
 
     } catch (error) {
       console.log('ERROR', error);
@@ -249,6 +302,9 @@ export default class MotionComponent extends Component {
 
     const fromTransformString = serializeValuesAsTransform(fromValues);
     const toTransformString = serializeValuesAsTransform(toValues);
+
+    console.log('FROM: ', fromTransformString);
+    console.log('TO: ', toTransformString);
 
     if (fromTransformString === toTransformString || (springFrom === 0 && springTo === springFrom)) {
       return element.animate([
@@ -388,7 +444,7 @@ export default class MotionComponent extends Component {
           x: positionalValues['x']?.(this.boundingClientRect , this.computedStyles),
           y: positionalValues['y']?.(this.boundingClientRect , this.computedStyles),
           borderColor: this.computedStyles.borderColor
-        }, this.boundingClientRect, this.cumulativeTransform);
+        }, this.boundingClientRect, this.cumulativeTransform, this.computedStyles);
       }
     }
   }
