@@ -6,13 +6,14 @@ import {
   getRelativeOffsetRect,
   positionalValues,
   transformValues
-} from '../util';
-import springToKeyframes from '../spring';
+} from '../-private/util';
+import springToKeyframes from '../-private/interpolation/spring';
 import { inject as service } from '@ember/service';
-import { getDefaultTransition } from "../default-transitions";
-import { cumulativeTransform, parseTransform } from "../transform";
-import {serializeValuesAsTransform} from "../transform-utils";
-import MatrixMath from '../matrix-math';
+import { getDefaultTransition } from "../-private/transitions/default";
+import { cumulativeTransform, parseTransform } from "../-private/transform/transform";
+import {serializeValuesAsTransform} from "../-private/transform/serialize";
+import { decomposeTransform } from "../-private/transform/decompose";
+import {calculateMagicMove} from "../-private/motion/magic-move";
 
 function isTransitionDefined({
   when,
@@ -27,14 +28,6 @@ function isTransitionDefined({
   ...transition
 }) {
   return !!Object.keys(transition).length
-}
-
-export function toDegrees (angle) {
-  return angle * (180 / Math.PI);
-}
-
-export function toRadians (angle) {
-  return angle * (Math.PI / 180);
 }
 
 export default class MotionComponent extends Component {
@@ -74,81 +67,23 @@ export default class MotionComponent extends Component {
 
     if (this.sharedLayout?.outGoing.has(this.args.layoutId)) {
       const {
-        boundingBox: sourceBoundingClientRect,
-        initialProps,
-        sourceCumulativeTransform: sourceMatrix,
-        //styles
+        animate: initialProps,
+        boundingClientRect: sourceBoundingClientRect,
+        cumulativeTransform: sourceTransform
       } = this.sharedLayout.outGoing.get(this.args.layoutId);
       this.sharedLayout.outGoing.delete(this.args.layoutId);
 
-      const targetMatrix = cumulativeTransform(this.element);
+      const targetTransform = cumulativeTransform(this.element);
       const targetBoundingClientRect = this.element.getBoundingClientRect();
-
-      const sourceMatrix_4x4 = [
-        sourceMatrix.a, sourceMatrix.b, 0, 0,
-        sourceMatrix.c, sourceMatrix.d, 0, 0,
-        0, 0, 1, 0,
-        sourceMatrix.tx, sourceMatrix.ty, 0, 1
-      ];
-      const targetMatrix_4x4 = [
-        targetMatrix.a, targetMatrix.b, 0, 0,
-        targetMatrix.c, targetMatrix.d, 0, 0,
-        0, 0, 1, 0,
-        targetMatrix.tx, targetMatrix.ty, 0, 1
-      ];
-
-      const decomposedSourceMatrix = MatrixMath.decomposeMatrix(sourceMatrix_4x4);
-      const decomposedTargetMatrix = MatrixMath.decomposeMatrix(targetMatrix_4x4);
-
-      const scaleX = decomposedSourceMatrix.scaleX / decomposedTargetMatrix.scaleX;
-      const scaleY = decomposedSourceMatrix.scaleY / decomposedTargetMatrix.scaleY;
-
-      const skewX = decomposedSourceMatrix.skewX - decomposedTargetMatrix.skewX;
-      const skewY = decomposedSourceMatrix.skewY - decomposedTargetMatrix.skewY;
-
-      const rotate = decomposedSourceMatrix.rotate - decomposedTargetMatrix.rotate;
-
-      // X/Y should be the diff between the source transform origin & target transform origin
-      let x = (sourceBoundingClientRect.x + sourceBoundingClientRect.width / 2) - (targetBoundingClientRect.x + targetBoundingClientRect.width / 2);
-      let y = (sourceBoundingClientRect.y + sourceBoundingClientRect.height / 2) - (targetBoundingClientRect.y + targetBoundingClientRect.height / 2);
-
-      // scale correction
-      x /= decomposedTargetMatrix.scaleX;
-      y /= decomposedTargetMatrix.scaleY;
-
-      // rotation correction
-      const rotate_rad = -1 * toRadians(decomposedTargetMatrix.rotate);
-
-      // compensate for translateY based on rotation
-      let y_d1 = y - Math.cos(rotate_rad) * y;
-      let x_d1 = Math.sin(rotate_rad) * y;
-
-      // compensate for translateX based on rotation
-      let x_d2 = x - Math.cos(rotate_rad) * x;
-      let y_d2 = Math.sin(rotate_rad) * x;
-
-      x -= x_d1;
-      y -= y_d1;
-      x -= x_d2;
-      y += y_d2;
-
-      // skew correction
-      let x_delta = Math.tan(toRadians(decomposedTargetMatrix.skewX)) * y;
-      let y_delta = Math.tan(toRadians(decomposedTargetMatrix.skewY)) * x;
-      console.log(rotate, 'DELTA', x_delta, y_delta, decomposedTargetMatrix.skewX, decomposedTargetMatrix.skewY);
-
-      x -= x_delta;
-      y -= y_delta;
 
       const initial = {
         ...initialProps,
-        x,
-        y,
-        scaleX,
-        scaleY,
-        rotate,
-        skewX,
-        skewY
+        ...calculateMagicMove({
+          sourceTransform,
+          targetTransform,
+          sourceBoundingClientRect,
+          targetBoundingClientRect
+        })
       };
 
       const animate = {
@@ -237,9 +172,7 @@ export default class MotionComponent extends Component {
       const fromValues = initial ?? (this.args.orphan && exit ? animate : {});
       const toValues = exit ?? animate;
 
-      // TODO translate transform related properties (e.g. "x, y" => "translateX(x) translateY(y))")
-      // TODO put all transform related animations in a single animation so we don't need compositing
-      // TODO take into account units
+      // TODO take into account the proper units
 
       const {
         toValuesNormal,
@@ -263,22 +196,16 @@ export default class MotionComponent extends Component {
         fromValuesTransform: {}
       });
 
-      const fromTransform = parseTransform(styles.transform);//ownTransform(element);
-      const decomposed3d = MatrixMath.decomposeMatrix([
-        fromTransform.a, fromTransform.b, 0, 0,
-        fromTransform.c, fromTransform.d, 0, 0,
-        0, 0, 1, 0,
-        fromTransform.tx, fromTransform.ty, 0, 1
-      ]);
+      const {
+        translateX: x,
+        translateY: y,
+        ...decomposed
+      } = decomposeTransform(parseTransform(styles.transform));
 
       const transformAnimation = this.getTransformAnimation(element, toValuesTransform, {
-        x: decomposed3d.translateX,
-        y: decomposed3d.translateY,
-        scaleX: decomposed3d.scaleX,
-        scaleY: decomposed3d.scaleY,
-        rotate: decomposed3d.rotate,
-        skewX: decomposed3d.skewX,
-        skewY: decomposed3d.skewY,
+        x,
+        y,
+        ...decomposed,
         ...fromValuesTransform
       });
       this.animations = [transformAnimation, ...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
@@ -440,11 +367,10 @@ export default class MotionComponent extends Component {
 
       if(this.args.layoutId && this.sharedLayout) {
         this.sharedLayout.notifyDestroying(this.args.layoutId, {
-          ...this.args.animate,
-          x: positionalValues['x']?.(this.boundingClientRect , this.computedStyles),
-          y: positionalValues['y']?.(this.boundingClientRect , this.computedStyles),
-          borderColor: this.computedStyles.borderColor
-        }, this.boundingClientRect, this.cumulativeTransform, this.computedStyles);
+          animate: this.args.animate,
+          boundingClientRect: this.boundingClientRect,
+          cumulativeTransform: this.cumulativeTransform
+        });
       }
     }
   }

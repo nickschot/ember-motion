@@ -40,7 +40,7 @@ export default class AnimateSharedLayoutComponent extends Component {
   }
 
   @action
-  notifyDestroying(layoutId, initialProps, boundingBox, sourceCumulativeTransform, styles) {
-    this.outGoing.set(layoutId, { initialProps, boundingBox, sourceCumulativeTransform, styles });
+  notifyDestroying(layoutId, data) {
+    this.outGoing.set(layoutId, data);
   }
 }
