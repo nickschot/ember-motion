@@ -12,8 +12,8 @@ import { inject as service } from '@ember/service';
 import { getDefaultTransition } from "../-private/transitions/default";
 import { cumulativeTransform, parseTransform } from "../-private/transform/transform";
 import {serializeValuesAsTransform} from "../-private/transform/serialize";
-import { decomposeTransform } from "../-private/transform/decompose";
-import {calculateMagicMove} from "../-private/motion/magic-move";
+import { decomposeTransform } from "../-private/transform/matrix";
+import { calculateMagicMove } from "../-private/motion/magic-move";
 
 function isTransitionDefined({
   when,
@@ -153,6 +153,7 @@ export default class MotionComponent extends Component {
 
     //console.log(ownTransform(this.element), cumulativeTransform(this.element));
 
+    console.log('ANIMATING');
     this.animateAllTask.perform({
       element: this.element,
       initial,
@@ -205,7 +206,11 @@ export default class MotionComponent extends Component {
       const transformAnimation = this.getTransformAnimation(element, toValuesTransform, {
         x,
         y,
-        ...decomposed,
+        scaleX: decomposed.scaleX,
+        scaleY: decomposed.scaleY,
+        skewX: decomposed.skewX,
+        skewY: decomposed.skewY,
+        rotate: decomposed.rotate,
         ...fromValuesTransform
       });
       this.animations = [transformAnimation, ...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);

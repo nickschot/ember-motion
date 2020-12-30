@@ -1,5 +1,5 @@
-import {decomposeTransform} from "../transform/decompose";
-import {toRadians} from "../util";
+import { decomposeTransform } from "../transform/matrix";
+import { toRadians } from "../util";
 
 export function calculateMagicMove({
   sourceTransform,
@@ -13,8 +13,8 @@ export function calculateMagicMove({
   const scaleX = source.scaleX / target.scaleX;
   const scaleY = source.scaleY / target.scaleY;
 
-  const skewX = source.skewX - target.skewX;
-  const skewY = source.skewY - target.skewY;
+  let skewX = source.skewX - target.skewX;
+  let skewY = source.skewY - target.skewY;
 
   const rotate = source.rotate - target.rotate;
 
@@ -43,27 +43,32 @@ export function calculateMagicMove({
   x -= x_d2;
   y += y_d2;
 
-  /*
-    // skew correction
-    let x_delta = Math.tan(toRadians(decomposedTargetMatrix.skewX)) * y;
-    let y_delta = Math.tan(toRadians(decomposedTargetMatrix.skewY)) * x;
+  // skew correction
+  console.log(target.skewX, target.skewY);
+  let x_delta = Math.tan(toRadians(target.skewX)) * y;
+  let y_delta = Math.tan(toRadians(target.skewY)) * x;
 
-    x -= x_delta;
-    y -= y_delta;
+  x -= x_delta;
+  y -= y_delta;
 
-    let skewed_x = x * Math.cos(toRadians(decomposedTargetMatrix.skewY));
-    let skewed_y = y * Math.cos(toRadians(decomposedTargetMatrix.skewX));
+  /*skewX /= scaleX;
+  skewY /= scaleY;*/
 
-    let scaleX_delta = skewed_x / x;
-    let scaleY_delta = skewed_y / y;
-    scaleX_delta = isNaN(scaleX_delta) ? 0 : scaleX_delta;
-    scaleY_delta = isNaN(scaleY_delta) ? 0 : scaleY_delta;
+/*
+  let skewed_x = x * Math.cos(toRadians(target.skewY));
+  let skewed_y = y * Math.cos(toRadians(target.skewX));
 
-    scaleX *= scaleX_delta;
-    scaleY *= scaleY_delta;
+  let scaleX_delta = skewed_x / x;
+  let scaleY_delta = skewed_y / y;
+  scaleX_delta = isNaN(scaleX_delta) ? 0 : scaleX_delta;
+  scaleY_delta = isNaN(scaleY_delta) ? 0 : scaleY_delta;
 
-    rotate -= (skewX / 2 + skewY / 2);
-  */
+  scaleX *= scaleX_delta;
+  scaleY *= scaleY_delta;
+
+  rotate -= (skewX / 2 + skewY / 2);
+*/
+
 
   return {
     x,
