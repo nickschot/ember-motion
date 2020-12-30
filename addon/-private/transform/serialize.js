@@ -3,7 +3,7 @@ const transformKeyAlias = new Map([
   ['y', 'translateY']
 ]);
 const axes = ["", "X", "Y", "Z"];
-const order = ['perspective', 'translate', 'rotate', 'scale', 'skew'];
+const order = ['perspective', 'translate', 'rotate', 'skew', 'scale'];
 const transformProps = [];
 order.forEach((key) => {
   axes.forEach((axis) => {
@@ -12,7 +12,7 @@ order.forEach((key) => {
 });
 
 export function sortTransformProps(a, b) {
-  return transformProps.indexOf(a) - transformProps.indexOf(b)
+  return transformProps.indexOf(a) - transformProps.indexOf(b);
 }
 
 // TODO: unit conversion needs to happen in a more generic way

@@ -1,5 +1,6 @@
 import { decomposeTransform } from "../transform/matrix";
 import { toRadians } from "../util";
+import { runInDebug } from '@ember/debug';
 
 export function calculateMagicMove({
   sourceTransform,
@@ -17,6 +18,12 @@ export function calculateMagicMove({
   let skewY = source.skewY - target.skewY;
 
   const rotate = source.rotate - target.rotate;
+
+  runInDebug(() => {
+    if (rotate && (parseFloat(skewX.toFixed(3)) || parseFloat(skewY.toFixed(3)))) {
+      console.error('Transforming between elements with both rotate and skew applied is not currently supported.');
+    }
+  });
 
   // diff between the source transform origin & target transform origin
   // TODO: allow different origins than 50%/50%
@@ -43,16 +50,12 @@ export function calculateMagicMove({
   x -= x_d2;
   y += y_d2;
 
+  // TODO: properly support skew combined with other properties (scaling of a single axis, rotation)
   // skew correction
-  console.log(target.skewX, target.skewY);
   let x_delta = Math.tan(toRadians(target.skewX)) * y;
   let y_delta = Math.tan(toRadians(target.skewY)) * x;
-
   x -= x_delta;
   y -= y_delta;
-
-  /*skewX /= scaleX;
-  skewY /= scaleY;*/
 
 /*
   let skewed_x = x * Math.cos(toRadians(target.skewY));
@@ -68,7 +71,6 @@ export function calculateMagicMove({
 
   rotate -= (skewX / 2 + skewY / 2);
 */
-
 
   return {
     x,

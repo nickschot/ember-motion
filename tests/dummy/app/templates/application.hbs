@@ -62,7 +62,7 @@
   <ul>
     {{#each this.colors as |color index|}}
       {{#if (eq index 0)}}
-        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scale(0.5) skewX(30deg);">
+        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scale(0.5) rotate(-15deg)">
           {{#if (eq color this.selected)}}
             <Motion
               @layoutId="outline"
@@ -75,7 +75,7 @@
           scale 0.5
         </li>
       {{else if (eq index 1)}}
-        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scaleX(2);">
+        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scale(1.25) rotate(30deg);">
           {{#if (eq color this.selected)}}
             <Motion
               @layoutId="outline"
@@ -88,7 +88,7 @@
           scale 1.25
         </li>
       {{else}}
-        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: rotate(0deg)">
+        <li class="item" {{on "click" (fn (mut this.selected) color)}} style="background-color: {{color}}; transform: scale(1)">
           {{#if (eq color this.selected)}}
             <Motion
               @layoutId="outline"
