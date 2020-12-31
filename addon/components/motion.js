@@ -4,39 +4,20 @@ import { task, all } from 'ember-concurrency';
 import {
   copyComputedStyle,
   getRelativeOffsetRect,
-  positionalValues,
   transformValues
 } from '../-private/util';
-import springToKeyframes from '../-private/interpolation/spring';
 import { inject as service } from '@ember/service';
-import { getDefaultTransition } from "../-private/transitions/default";
 import { cumulativeTransform, parseTransform } from "../-private/transform/transform";
-import {serializeValuesAsTransform} from "../-private/transform/serialize";
 import { decomposeTransform } from "../-private/transform/matrix";
 import { calculateMagicMove } from "../-private/motion/magic-move";
-
-function isTransitionDefined({
-  when,
-  delay,
-  delayChildren,
-  staggerChildren,
-  staggerDirection,
-  repeat,
-  repeatType,
-  repeatDelay,
-  from,
-  ...transition
-}) {
-  return !!Object.keys(transition).length
-}
+import {getValueAnimation} from "../-private/animation/get-value-animation";
+import {getTransformAnimation} from "../-private/animation/get-transform-animation";
 
 export default class MotionComponent extends Component {
   @service motion;
 
   element;
-  animation;
   animations = [];
-  frames;
   sharedLayout;
   computedStyles;
   boundingClientRect;
@@ -66,38 +47,7 @@ export default class MotionComponent extends Component {
     }
 
     if (this.sharedLayout?.outGoing.has(this.args.layoutId)) {
-      const {
-        animate: initialProps,
-        boundingClientRect: sourceBoundingClientRect,
-        cumulativeTransform: sourceTransform
-      } = this.sharedLayout.outGoing.get(this.args.layoutId);
-      this.sharedLayout.outGoing.delete(this.args.layoutId);
-
-      const targetTransform = cumulativeTransform(this.element);
-      const targetBoundingClientRect = this.element.getBoundingClientRect();
-
-      const initial = {
-        ...initialProps,
-        ...calculateMagicMove({
-          sourceTransform,
-          targetTransform,
-          sourceBoundingClientRect,
-          targetBoundingClientRect
-        })
-      };
-
-      const animate = {
-        ...Object.entries(initial).reduce((result, [k, v]) => {
-          // TODO: set appropriate default value for type
-          result[k] = 0;
-          return result;
-        }, {}),
-        scaleX: 1,
-        scaleY: 1,
-        ...this.args.animate,
-      };
-
-      this.animate(null, { initial, animate });
+      this.animateIncoming(this.args.layoutId);
     } else if (this.args.initial) {
       this.animate(element, {
         initial: this.args.initial,
@@ -140,7 +90,7 @@ export default class MotionComponent extends Component {
     /*let duration = this.duration;
     let initialVelocity = 0;
 
-    if (this.animateAllTask.isRunning) {
+    if (this.animateTask.isRunning) {
       this.animation.pause();
       const timing = this.animation.effect.getComputedTiming();
       duration *= timing.progress;
@@ -151,10 +101,7 @@ export default class MotionComponent extends Component {
       }
     }*/
 
-    //console.log(ownTransform(this.element), cumulativeTransform(this.element));
-
-    console.log('ANIMATING');
-    this.animateAllTask.perform({
+    this.animateTask.perform({
       element: this.element,
       initial,
       animate,
@@ -203,7 +150,7 @@ export default class MotionComponent extends Component {
         ...decomposed
       } = decomposeTransform(parseTransform(styles.transform));
 
-      const transformAnimation = this.getTransformAnimation(element, toValuesTransform, {
+      const transformAnimation = getTransformAnimation(element, toValuesTransform, {
         x,
         y,
         scaleX: decomposed.scaleX,
@@ -212,10 +159,13 @@ export default class MotionComponent extends Component {
         skewY: decomposed.skewY,
         rotate: decomposed.rotate,
         ...fromValuesTransform
-      });
-      this.animations = [transformAnimation, ...this.animations, ...Object.entries(toValuesNormal).map(([key, toValue]) => this.getValueAnimation(element, styles, key, fromValues[key], toValue, transition))].filter(Boolean);
-      yield all(this.animations.map((a) => { /*if (a.persist) { a.persist(); }*/ return a.finished }));
+      }, this.args.transition);
 
+      const valueAnimations = Object.entries(toValuesNormal)
+        .map(([key, toValue]) => getValueAnimation(element, styles, key, fromValues[key], toValue, transition, undefined, this.boundingBox));
+
+      this.animations = [transformAnimation, ...valueAnimations].filter(Boolean);
+      yield all(this.animations.map((a) => a.finished));
     } catch (error) {
       console.log('ERROR', error);
     } finally {
@@ -224,119 +174,42 @@ export default class MotionComponent extends Component {
       }
     }
   }).restartable())
-  animateAllTask;
+  animateTask;
 
   @action
-  getTransformAnimation(element, toValues, fromValues) {
-    // TODO: what if we don't have x/y ???
-    let springFrom = Math.sqrt(Math.pow(fromValues.x ?? 0, 2) + Math.pow(fromValues.y ?? 0, 2));
-    let springTo = Math.sqrt(Math.pow(toValues.x ?? 0, 2) + Math.pow(toValues.y ?? 0, 2));
+  animateIncoming(layoutId) {
+    const {
+      animate: initialProps,
+      boundingClientRect: sourceBoundingClientRect,
+      cumulativeTransform: sourceTransform
+    } = this.sharedLayout.outGoing.get(layoutId);
+    this.sharedLayout.outGoing.delete(layoutId);
 
-    const fromTransformString = serializeValuesAsTransform(fromValues);
-    const toTransformString = serializeValuesAsTransform(toValues);
+    const targetTransform = cumulativeTransform(this.element);
+    const targetBoundingClientRect = this.element.getBoundingClientRect();
 
-    console.log('FROM: ', fromTransformString);
-    console.log('TO: ', toTransformString);
-
-    if (fromTransformString === toTransformString || (springFrom === 0 && springTo === springFrom)) {
-      return element.animate([
-        {
-          transform: fromTransformString
-        },
-        {
-          transform: toTransformString
-        }
-      ], {
-        fill: "both",
-        easing: "linear",
-        duration: 0,
-        composite: "replace"
-      });
-    }
-
-    // TODO: add tween support
-    const frames = springToKeyframes({
-      fromValue: 0,
-      initialVelocity: 0,
-      ...getDefaultTransition('x', springTo - springFrom),
-      ...(this.args.transition?.type === "spring" ? this.args.transition : undefined),
-    });
-
-    // TODO: implement this as a callback in the spring so we can save doing this map operation
-    const keyframes = frames.map(({ value }) => {
-      const scalar = value / (springTo - springFrom);
-      const frame = Object.fromEntries(
-        Object
-          .entries(toValues)
-          .map(([key, toValue]) => [key, (fromValues[key] ?? 0) + scalar * (toValue - (fromValues[key] ?? 0))])
-      );
-
-      return {
-        transform: serializeValuesAsTransform(frame)
-      };
-    });
-
-    return element.animate(keyframes, {
-      fill: "both",
-      easing: "linear",
-      duration: frames[frames.length - 1].time,
-      composite: "replace"
-    });
-  }
-
-  @action
-  getValueAnimation(element, styles, key, fromValue, toValue, transition, composite) {
-    const options = {
-      fromValue: fromValue ?? positionalValues[key]?.(this.boundingBox , styles) ?? styles[key],
-      toValue,
-      initialVelocity: 0
+    const initial = {
+      ...initialProps,
+      ...calculateMagicMove({
+        sourceTransform,
+        targetTransform,
+        sourceBoundingClientRect,
+        targetBoundingClientRect
+      })
     };
 
-    // if the values are identical, apply an animation with a duration of 0 so we at least have the styles applied
-    if (options.fromValue == options.toValue || (!isNaN(parseFloat(options.fromValue)) && parseFloat(options.fromValue) === parseFloat(options.toValue))) {
-      return element.animate([
-        this.keyValueToCss(key, options.fromValue),
-        this.keyValueToCss(key, options.toValue)
-      ], {
-        fill: "both",
-        easing: "linear",
-        duration: 0,
-        composite
-      })
-    }
+    const animate = {
+      ...Object.entries(initial).reduce((result, [k, v]) => {
+        // TODO: set appropriate default value for type
+        result[k] = 0;
+        return result;
+      }, {}),
+      scaleX: 1,
+      scaleY: 1,
+      ...this.args.animate,
+    };
 
-    const animation = isTransitionDefined(transition)
-      ? { ...options, ...transition }
-      : { ...options, ...getDefaultTransition(key, toValue)};
-
-    let keyframes = [];
-    if (animation.type === "spring") {
-      let frames = springToKeyframes(animation);
-      keyframes = frames.map(({ value }) => this.keyValueToCss(key, value));
-      animation.duration = frames[frames.length - 1].time;
-    } else if (animation.type === "tween") {
-      animation.easing = animation.easing ?? "linear";
-      animation.duration = animation.duration ?? 300;
-      keyframes = [
-        this.keyValueToCss(key, animation.fromValue),
-        this.keyValueToCss(key, animation.toValue)
-      ];
-    }
-
-    return element.animate(keyframes, {
-      fill: "both",
-      easing: animation.easing,
-      duration: animation.duration,
-      composite
-    });
-  }
-
-  keyValueToCss(key, value) {
-    if (typeof value === 'number' && !['opacity'].includes(key)) {
-      return { [key]: `${parseFloat(value)}px` };
-    }
-
-    return { [key]: value };
+    this.animate(null, { initial, animate });
   }
 
   /**
@@ -345,8 +218,8 @@ export default class MotionComponent extends Component {
    */
   @action
   onWillDestroyElement(element) {
-    if (this.animateAllTask.isRunning) {
-      this.animateAllTask.cancelAll();
+    if (this.animateTask.isRunning) {
+      this.animateTask.cancelAll();
     }
 
     this.boundingClientRect = element.getBoundingClientRect();
