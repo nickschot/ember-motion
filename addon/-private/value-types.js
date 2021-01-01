@@ -10,15 +10,15 @@ import {
   vw,
   vh,
   complex,
-} from "style-value-types"
+} from 'style-value-types';
 
 /**
  * ValueType for "auto"
  */
 export const auto = {
-  test: (v) => v === "auto",
-  parse: v => v,
-}
+  test: (v) => v === 'auto',
+  parse: (v) => v,
+};
 
 /**
  * ValueType for ints
@@ -26,7 +26,7 @@ export const auto = {
 const int = {
   ...number,
   transform: Math.round,
-}
+};
 
 /**
  * A map of default value types for common values
@@ -113,28 +113,27 @@ const defaultValueTypes = {
   fillOpacity: alpha,
   strokeOpacity: alpha,
   numOctaves: int,
-}
+};
 
 /**
  * A list of value types commonly used for dimensions
  */
-const dimensionValueTypes = [number, px, percent, degrees, vw, vh, auto]
+const dimensionValueTypes = [number, px, percent, degrees, vw, vh, auto];
 
 /**
  * Tests a provided value against a ValueType
  */
-const testValueType = (v) => (type) => type.test(v)
+const testValueType = (v) => (type) => type.test(v);
 
 /**
  * Tests a dimensional value against the list of dimension ValueTypes
  */
-export const findDimensionValueType = (v) =>
-  dimensionValueTypes.find(testValueType(v))
+export const findDimensionValueType = (v) => dimensionValueTypes.find(testValueType(v));
 
 /**
  * A list of all ValueTypes
  */
-const valueTypes = [...dimensionValueTypes, color, complex]
+const valueTypes = [...dimensionValueTypes, color, complex];
 
 /**
  * Tests a value against the list of ValueTypes
@@ -150,7 +149,5 @@ export const getDefaultValueType = (key) => defaultValueTypes[key];
  * Provided a value and a ValueType, returns the value as that value type.
  */
 export const getValueAsType = (value, type) => {
-  return type && typeof value === "number"
-    ? type.transform(value)
-    : value
-}
+  return type && typeof value === 'number' ? type.transform(value) : value;
+};

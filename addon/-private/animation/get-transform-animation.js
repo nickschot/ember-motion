@@ -1,6 +1,6 @@
-import {serializeValuesAsTransform} from "../transform/serialize";
-import springToKeyframes from "../interpolation/spring";
-import {getDefaultTransition, linearTween} from "../transitions/default";
+import { serializeValuesAsTransform } from '../transform/serialize';
+import springToKeyframes from '../interpolation/spring';
+import { getDefaultTransition, linearTween } from '../transitions/default';
 
 export function getTransformAnimation(element, toValues, fromValues, transition) {
   // TODO: what if we don't have x/y ???
@@ -14,31 +14,34 @@ export function getTransformAnimation(element, toValues, fromValues, transition)
   console.log('TO: ', toTransformString);
 
   if (fromTransformString === toTransformString || (springFrom === 0 && springTo === springFrom)) {
-    return element.animate([
+    return element.animate(
+      [
+        {
+          transform: fromTransformString,
+        },
+        {
+          transform: toTransformString,
+        },
+      ],
       {
-        transform: fromTransformString
-      },
-      {
-        transform: toTransformString
+        fill: 'both',
+        easing: 'linear',
+        duration: 0,
+        composite: 'replace',
       }
-    ], {
-      fill: "both",
-      easing: "linear",
-      duration: 0,
-      composite: "replace"
-    });
+    );
   }
 
-  const type = transition?.type ?? "spring";
+  const type = transition?.type ?? 'spring';
   let keyframes = [];
   let options = {
-    fill: "both",
-    easing: "linear",
-    composite: "replace"
+    fill: 'both',
+    easing: 'linear',
+    composite: 'replace',
   };
 
   // TODO: add tween support
-  if (type === "spring") {
+  if (type === 'spring') {
     const frames = springToKeyframes({
       fromValue: 0,
       initialVelocity: 0,
@@ -51,35 +54,34 @@ export function getTransformAnimation(element, toValues, fromValues, transition)
     keyframes = frames.map(({ value }) => {
       const scalar = value / (springTo - springFrom);
       const frame = Object.fromEntries(
-        Object
-          .entries(toValues)
-          .map(([key, toValue]) => [key, (fromValues[key] ?? 0) + scalar * (toValue - (fromValues[key] ?? 0))])
+        Object.entries(toValues).map(([key, toValue]) => [
+          key,
+          (fromValues[key] ?? 0) + scalar * (toValue - (fromValues[key] ?? 0)),
+        ])
       );
 
       return {
-        transform: serializeValuesAsTransform(frame)
+        transform: serializeValuesAsTransform(frame),
       };
     });
-
-
-  } else if (transition.type === "tween") {
+  } else if (transition.type === 'tween') {
     keyframes = [
       {
-        transform: fromTransformString
+        transform: fromTransformString,
       },
       {
-        transform: toTransformString
-      }
+        transform: toTransformString,
+      },
     ];
     options = {
       ...options,
       ...linearTween(),
-      ...transition
-    }
+      ...transition,
+    };
   }
 
   return {
     animation: element.animate(keyframes, options),
-    duration: options.duration
+    duration: options.duration,
   };
 }

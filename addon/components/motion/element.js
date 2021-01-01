@@ -11,5 +11,5 @@ export default Component.extend({
 
   willDestroyElement() {
     this.onWillDestroyElement?.(this.element);
-  }
+  },
 });

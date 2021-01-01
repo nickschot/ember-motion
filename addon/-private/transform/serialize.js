@@ -1,15 +1,15 @@
-import {getDefaultValueType, getValueAsType} from "../value-types";
+import { getDefaultValueType, getValueAsType } from '../value-types';
 
 const transformKeyAlias = new Map([
   ['x', 'translateX'],
-  ['y', 'translateY']
+  ['y', 'translateY'],
 ]);
-const axes = ["", "X", "Y", "Z"];
+const axes = ['', 'X', 'Y', 'Z'];
 const order = ['perspective', 'translate', 'rotate', 'skew', 'scale'];
 const transformProps = [];
 order.forEach((key) => {
   axes.forEach((axis) => {
-    transformProps.push(`${key}${axis}`)
+    transformProps.push(`${key}${axis}`);
   });
 });
 

@@ -1,4 +1,4 @@
-export const DELTA_TIME_MS = 1 / 60 * 1000; // 1 frame, 60 FPS
+export const DELTA_TIME_MS = (1 / 60) * 1000; // 1 frame, 60 FPS
 
 function invariant(condition, message) {
   if (!condition) {
@@ -6,7 +6,7 @@ function invariant(condition, message) {
   }
 }
 
-function isSpringOvershooting({stiffness, fromValue, toValue, overshootClamping, value}) {
+function isSpringOvershooting({ stiffness, fromValue, toValue, overshootClamping, value }) {
   let isOvershooting = false;
   if (overshootClamping && stiffness !== 0) {
     if (fromValue < toValue) {
@@ -18,7 +18,7 @@ function isSpringOvershooting({stiffness, fromValue, toValue, overshootClamping,
   return isOvershooting;
 }
 
-function isSpringAtRest({stiffness, toValue, restDisplacementThreshold, restVelocityThreshold, value, velocity}) {
+function isSpringAtRest({ stiffness, toValue, restDisplacementThreshold, restVelocityThreshold, value, velocity }) {
   const isNoVelocity = Math.abs(velocity) <= restVelocityThreshold;
   const isNoDisplacement = stiffness !== 0 && Math.abs(toValue - value) <= restDisplacementThreshold;
   return isNoDisplacement && isNoVelocity;
@@ -36,12 +36,12 @@ function advanceSpringToTime(
     allowsOverdamping,
     overshootClamping,
     restDisplacementThreshold,
-    restVelocityThreshold
+    restVelocityThreshold,
   }
 ) {
-  invariant(m > 0, "Mass value must be greater than 0");
-  invariant(k > 0, "Stiffness value must be greater than 0");
-  invariant(c > 0, "Damping value must be greater than 0");
+  invariant(m > 0, 'Mass value must be greater than 0');
+  invariant(k > 0, 'Stiffness value must be greater than 0');
+  invariant(c > 0, 'Damping value must be greater than 0');
 
   let zeta = c / (2 * Math.sqrt(k * m)); // damping ratio (dimensionless)
   const omega0 = Math.sqrt(k / m) / 1000; // undamped angular frequency of the oscillator (rad/ms)
@@ -60,78 +60,70 @@ function advanceSpringToTime(
     // Under damped
     const envelope = Math.exp(-zeta * omega0 * t);
     oscillation =
-      toValue -
-      envelope *
-      ((v0 + zeta * omega0 * x0) / omega1 * Math.sin(omega1 * t) +
-        x0 * Math.cos(omega1 * t));
+      toValue - envelope * (((v0 + zeta * omega0 * x0) / omega1) * Math.sin(omega1 * t) + x0 * Math.cos(omega1 * t));
     // This looks crazy -- it's actually just the derivative of the
     // oscillation function
     velocity =
       zeta *
-      omega0 *
-      envelope *
-      (Math.sin(omega1 * t) * (v0 + zeta * omega0 * x0) / omega1 +
-        x0 * Math.cos(omega1 * t)) -
-      envelope *
-      (Math.cos(omega1 * t) * (v0 + zeta * omega0 * x0) -
-        omega1 * x0 * Math.sin(omega1 * t));
+        omega0 *
+        envelope *
+        ((Math.sin(omega1 * t) * (v0 + zeta * omega0 * x0)) / omega1 + x0 * Math.cos(omega1 * t)) -
+      envelope * (Math.cos(omega1 * t) * (v0 + zeta * omega0 * x0) - omega1 * x0 * Math.sin(omega1 * t));
   } else if (zeta === 1) {
     // Critically damped
     const envelope = Math.exp(-omega0 * t);
     oscillation = toValue - envelope * (x0 + (v0 + omega0 * x0) * t);
-    velocity =
-      envelope * (v0 * (t * omega0 - 1) + t * x0 * (omega0 * omega0));
+    velocity = envelope * (v0 * (t * omega0 - 1) + t * x0 * (omega0 * omega0));
   } else {
     // Overdamped
     const envelope = Math.exp(-zeta * omega0 * t);
     oscillation =
       toValue -
-      envelope *
-      ((v0 + zeta * omega0 * x0) * Math.sinh(omega2 * t) +
-        omega2 * x0 * Math.cosh(omega2 * t)) /
-      omega2;
+      (envelope * ((v0 + zeta * omega0 * x0) * Math.sinh(omega2 * t) + omega2 * x0 * Math.cosh(omega2 * t))) / omega2;
     velocity =
-      envelope *
-      zeta *
-      omega0 *
-      (Math.sinh(omega2 * t) * (v0 + zeta * omega0 * x0) +
-        x0 * omega2 * Math.cosh(omega2 * t)) /
-      omega2 -
-      envelope *
-      (omega2 * Math.cosh(omega2 * t) * (v0 + zeta * omega0 * x0) +
-        omega2 * omega2 * x0 * Math.sinh(omega2 * t)) /
-      omega2;
+      (envelope *
+        zeta *
+        omega0 *
+        (Math.sinh(omega2 * t) * (v0 + zeta * omega0 * x0) + x0 * omega2 * Math.cosh(omega2 * t))) /
+        omega2 -
+      (envelope *
+        (omega2 * Math.cosh(omega2 * t) * (v0 + zeta * omega0 * x0) + omega2 * omega2 * x0 * Math.sinh(omega2 * t))) /
+        omega2;
   }
 
   // If the Spring is overshooting (when overshoot clamping is on), or if the
   // spring is at rest (based on the thresholds set in the config), stop the
   // animation.
-  if ((isSpringOvershooting({
-    stiffness: k,
-    fromValue,
-    toValue,
-    overshootClamping,
-    value: oscillation
-  }) || isSpringAtRest({
-    stiffness: k,
-    toValue,
-    restDisplacementThreshold,
-    restVelocityThreshold,
-    value: oscillation,
-    velocity
-  })) && k !== 0) {
+  if (
+    (isSpringOvershooting({
+      stiffness: k,
+      fromValue,
+      toValue,
+      overshootClamping,
+      value: oscillation,
+    }) ||
+      isSpringAtRest({
+        stiffness: k,
+        toValue,
+        restDisplacementThreshold,
+        restVelocityThreshold,
+        value: oscillation,
+        velocity,
+      })) &&
+    k !== 0
+  ) {
     // Ensure that we end up with a round value
     return {
       time: timestamp,
       value: toValue,
-      velocity: 0
+      velocity: 0,
     };
   }
 
   return {
     time: timestamp,
     value: oscillation,
-    velocity
+    velocity,
   };
 }
 
@@ -148,16 +140,10 @@ export default function springToKeyframes(options) {
     restVelocityThreshold: 0.001,
     restDisplacementThreshold: 0.001,
     deltaTimeMs: DELTA_TIME_MS,
-    ...options
+    ...options,
   };
 
-  const {
-    stiffness,
-    initialVelocity,
-    restVelocityThreshold,
-    restDisplacementThreshold,
-    deltaTimeMs,
-  } = config;
+  const { stiffness, initialVelocity, restVelocityThreshold, restDisplacementThreshold, deltaTimeMs } = config;
 
   const fromValue = parseFloat(config.fromValue);
   const toValue = parseFloat(config.toValue);
@@ -178,7 +164,10 @@ export default function springToKeyframes(options) {
   let value = fromValue;
   let velocity = initialVelocity;
   const _config = { ...config, fromValue, toValue };
-  while (!isSpringAtRest({stiffness, toValue, restDisplacementThreshold, restVelocityThreshold, value, velocity}) && frames.length < MAX_FRAMES) {
+  while (
+    !isSpringAtRest({ stiffness, toValue, restDisplacementThreshold, restVelocityThreshold, value, velocity }) &&
+    frames.length < MAX_FRAMES
+  ) {
     const frame = advanceSpringToTime(time, _config);
     time += deltaTimeMs;
     value = frame.value;

@@ -14,14 +14,14 @@ export const overDampedSpring = (toValue) => ({
   damping: toValue === 0 ? 100 : 30,
   restDisplacementThreshold: 0.01,
   restVelocityThreshold: 10,
-  allowsOverdamping: true
+  allowsOverdamping: true,
 });
 
 export const linearTween = () => ({
-  type: "tween",
-  easing: "linear",
+  type: 'tween',
+  easing: 'linear',
   duration: 300,
-})
+});
 
 const defaultTransitions = {
   x: underDampedSpring,
@@ -41,13 +41,10 @@ const defaultTransitions = {
 
   borderColor: linearTween,
   //borderRadius: linearTween
-}
+};
 
-export const getDefaultTransition = (
-  valueKey,
-  toValue
-) => {
-  let transitionFactory = defaultTransitions[valueKey] || defaultTransitions.default
+export const getDefaultTransition = (valueKey, toValue) => {
+  let transitionFactory = defaultTransitions[valueKey] || defaultTransitions.default;
 
   return { toValue, ...transitionFactory(toValue) };
-}
+};

@@ -1,27 +1,23 @@
 import { camelize } from '@ember/string';
 
-export const getPosFromMatrix = (matrix, pos) =>
-  parseFloat(matrix.split(', ')[pos])
+export const getPosFromMatrix = (matrix, pos) => parseFloat(matrix.split(', ')[pos]);
 
-export const getTranslateFromMatrix = (
-  pos2,
-  pos3
-) => (_bbox, { transform }) => {
-  if (transform === "none" || !transform) return 0
+export const getTranslateFromMatrix = (pos2, pos3) => (_bbox, { transform }) => {
+  if (transform === 'none' || !transform) return 0;
 
-  const matrix3d = transform.match(/^matrix3d\((.+)\)$/)
+  const matrix3d = transform.match(/^matrix3d\((.+)\)$/);
 
   if (matrix3d) {
-    return getPosFromMatrix(matrix3d[1], pos3)
+    return getPosFromMatrix(matrix3d[1], pos3);
   } else {
-    const matrix = transform.match(/^matrix\((.+)\)$/)
+    const matrix = transform.match(/^matrix\((.+)\)$/);
     if (matrix) {
-      return getPosFromMatrix(matrix[1], pos2)
+      return getPosFromMatrix(matrix[1], pos2);
     } else {
-      return 0
+      return 0;
     }
   }
-}
+};
 
 export const positionalValues = {
   // Dimensions
@@ -36,7 +32,7 @@ export const positionalValues = {
   // Transform
   x: getTranslateFromMatrix(4, 13),
   y: getTranslateFromMatrix(5, 14),
-}
+};
 
 export const transformValues = [
   'x',
@@ -50,7 +46,7 @@ export const transformValues = [
   'scaleY',
   'scale',
   'skewX',
-  'skewY'
+  'skewY',
 ];
 
 export function copyComputedStyle(element) {
@@ -88,7 +84,7 @@ export const COPIED_CSS_PROPERTIES = [
   'border-bottom-right-radius',
   'box-shadow',
 
-  'transform'
+  'transform',
 ];
 
 export function getRelativeBoundingBox(a, b) {
@@ -110,10 +106,10 @@ export function getRelativeOffsetRect(a, b) {
   };
 }
 
-export function toDegrees (angle) {
+export function toDegrees(angle) {
   return angle * (180 / Math.PI);
 }
 
-export function toRadians (angle) {
+export function toRadians(angle) {
   return angle * (Math.PI / 180);
 }

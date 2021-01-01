@@ -1,17 +1,13 @@
 import Component from '@glimmer/component';
 import { action } from '@ember/object';
 import { task, all } from 'ember-concurrency';
-import {
-  copyComputedStyle,
-  getRelativeOffsetRect, positionalValues,
-  transformValues
-} from '../-private/util';
+import { copyComputedStyle, getRelativeOffsetRect, positionalValues, transformValues } from '../-private/util';
 import { inject as service } from '@ember/service';
-import { cumulativeTransform, parseTransform } from "../-private/transform/transform";
-import { decomposeTransform } from "../-private/transform/matrix";
-import { calculateMagicMove } from "../-private/motion/magic-move";
-import {getValueAnimation} from "../-private/animation/get-value-animation";
-import {getTransformAnimation} from "../-private/animation/get-transform-animation";
+import { cumulativeTransform, parseTransform } from '../-private/transform/transform';
+import { decomposeTransform } from '../-private/transform/matrix';
+import { calculateMagicMove } from '../-private/motion/magic-move';
+import { getValueAnimation } from '../-private/animation/get-value-animation';
+import { getTransformAnimation } from '../-private/animation/get-transform-animation';
 
 export default class MotionComponent extends Component {
   @service motion;
@@ -28,7 +24,7 @@ export default class MotionComponent extends Component {
 
     let sharedLayoutGuid;
     let parent = this.element.parentNode;
-    while(!sharedLayoutGuid && parent) {
+    while (!sharedLayoutGuid && parent) {
       sharedLayoutGuid = parent.getAttribute('data-animated-shared-layout-id');
       if (sharedLayoutGuid) {
         break;
@@ -51,7 +47,7 @@ export default class MotionComponent extends Component {
     } else if (this.args.initial) {
       this.animate(element, {
         initial: this.args.initial,
-        animate: this.args.animate
+        animate: this.args.animate,
       });
     } else if (this.args.exit) {
       if (!this.args.orphan) {
@@ -61,18 +57,18 @@ export default class MotionComponent extends Component {
       const offset = getRelativeOffsetRect(this.args.orphanOffsetRect, this.args.orphan.boundingBox);
       this.animate(element, {
         animate: {
-          ...offset
+          ...offset,
         },
         exit: {
           ...this.args.exit,
           x: (this.args.exit.x ?? 0) + offset.x,
-          y: (this.args.exit.y ?? 0) + offset.y
+          y: (this.args.exit.y ?? 0) + offset.y,
         },
       });
     } else {
       // FIXME this is the case for this.initial === false
       this.animate(element, {
-        animate: this.args.animate
+        animate: this.args.animate,
       });
     }
   }
@@ -80,7 +76,7 @@ export default class MotionComponent extends Component {
   @action
   onUpdate(element, [animate]) {
     this.animate(element, {
-      animate
+      animate,
     });
   }
 
@@ -106,12 +102,12 @@ export default class MotionComponent extends Component {
       initial,
       animate,
       exit,
-      transition: { ...this.args.transition/*, duration*/ },
-      initialVelocity: 0
+      transition: { ...this.args.transition /*, duration*/ },
+      initialVelocity: 0,
     });
   }
 
-  @(task(function*({ element, initial, animate, exit, transition }) {
+  @(task(function* ({ element, initial, animate, exit, transition }) {
     try {
       const styles = copyComputedStyle(element);
       this.styles = styles;
@@ -122,68 +118,64 @@ export default class MotionComponent extends Component {
 
       // TODO take into account the proper units
 
-      const {
-        toValuesNormal,
-        toValuesTransform,
-        fromValuesTransform
-      } = Object.entries(toValues).reduce((result, [key, value]) => {
-        if (transformValues.includes(key)) {
-          result.toValuesTransform[key] = value;
+      const { toValuesNormal, toValuesTransform, fromValuesTransform } = Object.entries(toValues).reduce(
+        (result, [key, value]) => {
+          if (transformValues.includes(key)) {
+            result.toValuesTransform[key] = value;
 
-          if (fromValues[key]) {
-            result.fromValuesTransform[key] = fromValues[key];
+            if (fromValues[key]) {
+              result.fromValuesTransform[key] = fromValues[key];
+            }
+          } else {
+            result.toValuesNormal[key] = value;
           }
-        } else {
-          result.toValuesNormal[key] = value;
+
+          return result;
+        },
+        {
+          toValuesNormal: {},
+          toValuesTransform: {},
+          fromValuesTransform: {},
+        }
+      );
+
+      const { translateX: x, translateY: y, ...decomposed } = decomposeTransform(parseTransform(styles.transform));
+
+      const { animation: transformAnimation, duration: transformDuration } = getTransformAnimation(
+        element,
+        toValuesTransform,
+        {
+          x,
+          y,
+          scaleX: decomposed.scaleX,
+          scaleY: decomposed.scaleY,
+          skewX: decomposed.skewX,
+          skewY: decomposed.skewY,
+          rotate: decomposed.rotate,
+          ...fromValuesTransform,
+        },
+        this.args.transition
+      );
+
+      const valueAnimations = Object.entries(toValuesNormal).map(([key, toValue]) => {
+        const fromValue = fromValues[key] ?? positionalValues[key]?.(this.boundingBox, styles) ?? styles[key];
+
+        // FIXME: workaround because we do not support "complex" values for springa nimations yet
+        let type = transition.type;
+        let duration = transition.duration;
+        if (isNaN(fromValue) || isNaN(toValue)) {
+          type = 'tween';
+          duration = transformDuration;
         }
 
-        return result;
-      }, {
-        toValuesNormal: {},
-        toValuesTransform: {},
-        fromValuesTransform: {}
-      });
-
-      const {
-        translateX: x,
-        translateY: y,
-        ...decomposed
-      } = decomposeTransform(parseTransform(styles.transform));
-
-      const {
-        animation: transformAnimation,
-        duration: transformDuration
-      } = getTransformAnimation(element, toValuesTransform, {
-        x,
-        y,
-        scaleX: decomposed.scaleX,
-        scaleY: decomposed.scaleY,
-        skewX: decomposed.skewX,
-        skewY: decomposed.skewY,
-        rotate: decomposed.rotate,
-        ...fromValuesTransform
-      }, this.args.transition);
-
-      const valueAnimations = Object.entries(toValuesNormal)
-        .map(([key, toValue]) => {
-          const fromValue = fromValues[key] ?? positionalValues[key]?.(this.boundingBox , styles) ?? styles[key];
-
-          // FIXME: workaround because we do not support "complex" values for springa nimations yet
-          let type = transition.type;
-          let duration = transition.duration;
-          if (isNaN(fromValue) || isNaN(toValue)) {
-            type = "tween";
-            duration = transformDuration;
-          }
-
-          return getValueAnimation({
-            element,
-            key,
-            fromValue,
-            toValue,
-            transition: { ...transition, type, duration }
-          });
+        return getValueAnimation({
+          element,
+          key,
+          fromValue,
+          toValue,
+          transition: { ...transition, type, duration },
         });
+      });
 
       this.animations = [transformAnimation, ...valueAnimations].filter(Boolean);
       yield all(this.animations.map((a) => a.finished));
@@ -202,7 +194,7 @@ export default class MotionComponent extends Component {
     const {
       animate: initialProps,
       boundingClientRect: sourceBoundingClientRect,
-      cumulativeTransform: sourceTransform
+      cumulativeTransform: sourceTransform,
     } = this.sharedLayout.outGoing.get(layoutId);
     this.sharedLayout.outGoing.delete(layoutId);
 
@@ -215,8 +207,8 @@ export default class MotionComponent extends Component {
         sourceTransform,
         targetTransform,
         sourceBoundingClientRect,
-        targetBoundingClientRect
-      })
+        targetBoundingClientRect,
+      }),
     };
 
     const animate = {
@@ -252,11 +244,11 @@ export default class MotionComponent extends Component {
         html: element.cloneNode(true),
         boundingBox: {
           x: window.pageXOffset + this.boundingClientRect.x,
-          y: window.pageYOffset + this.boundingClientRect.y
+          y: window.pageYOffset + this.boundingClientRect.y,
         },
         transition: this.args.transition,
         animate: this.computedStyles,
-        exit: this.args.exit
+        exit: this.args.exit,
       });
     }
 
@@ -264,11 +256,11 @@ export default class MotionComponent extends Component {
       // unregister first so we're sure we won't match against ourselves when matching layoutId
       this.sharedLayout?.unregisterMotion(this);
 
-      if(this.args.layoutId && this.sharedLayout) {
+      if (this.args.layoutId && this.sharedLayout) {
         this.sharedLayout.notifyDestroying(this.args.layoutId, {
           animate: this.args.animate,
           boundingClientRect: this.boundingClientRect,
-          cumulativeTransform: this.cumulativeTransform
+          cumulativeTransform: this.cumulativeTransform,
         });
       }
     }

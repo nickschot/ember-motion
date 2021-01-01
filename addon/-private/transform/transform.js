@@ -30,16 +30,11 @@ export default class Transform {
     return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.tx}, ${this.ty})`;
   }
 
-// See the comment below on `const identity`.
+  // See the comment below on `const identity`.
   isIdentity() {
     return (
       this === identity ||
-      (this.a === 1 &&
-        this.b === 0 &&
-        this.c === 0 &&
-        this.d === 1 &&
-        this.tx === 0 &&
-        this.ty === 0)
+      (this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.tx === 0 && this.ty === 0)
     );
   }
 
@@ -58,7 +53,7 @@ export default class Transform {
       this.a * other.c + this.c * other.d,
       this.b * other.c + this.d * other.d,
       this.a * other.tx + this.c * other.ty + this.tx,
-      this.b * other.tx + this.d * other.ty + this.ty,
+      this.b * other.tx + this.d * other.ty + this.ty
     );
   }
 
@@ -69,7 +64,7 @@ export default class Transform {
       this.c * multiplier,
       this.d * multiplier,
       this.tx * multiplier,
-      this.ty * multiplier,
+      this.ty * multiplier
     );
   }
 
@@ -160,8 +155,7 @@ export function cumulativeTransform(elt) {
  */
 export function ownTransform(elt) {
   let eltStyles = window.getComputedStyle(elt);
-  let t =
-    eltStyles.transform !== '' ? eltStyles.transform : elt.style.transform;
+  let t = eltStyles.transform !== '' ? eltStyles.transform : elt.style.transform;
   if (t === 'none') {
     // This constant value is an optimization, and we rely on that in
     // cumulativeTransform
@@ -184,7 +178,7 @@ export function ownTransform(elt) {
       .mult(matrix)
       .mult(new Transform(1, 0, 0, 1, -originX, -originY));
   } else {*/
-    // This case is an optimization for when there is only translation.
-    return matrix;
+  // This case is an optimization for when there is only translation.
+  return matrix;
   //}
 }

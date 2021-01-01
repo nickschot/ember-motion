@@ -11,6 +11,6 @@ export function isTransitionDefined({
   from,
   ...transition
 }) {
-  return !!Object.keys(transition).length
+  return !!Object.keys(transition).length;
 }
 /* eslint-enable no-unused-vars */

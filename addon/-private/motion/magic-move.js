@@ -1,12 +1,12 @@
-import { decomposeTransform } from "../transform/matrix";
-import { toRadians } from "../util";
+import { decomposeTransform } from '../transform/matrix';
+import { toRadians } from '../util';
 import { runInDebug } from '@ember/debug';
 
 export function calculateMagicMove({
   sourceTransform,
   targetTransform,
   sourceBoundingClientRect,
-  targetBoundingClientRect
+  targetBoundingClientRect,
 }) {
   const source = decomposeTransform(sourceTransform);
   const target = decomposeTransform(targetTransform);
@@ -27,8 +27,14 @@ export function calculateMagicMove({
 
   // diff between the source transform origin & target transform origin
   // TODO: allow different origins than 50%/50%
-  let x = (sourceBoundingClientRect.x + sourceBoundingClientRect.width / 2) - (targetBoundingClientRect.x + targetBoundingClientRect.width / 2);
-  let y = (sourceBoundingClientRect.y + sourceBoundingClientRect.height / 2) - (targetBoundingClientRect.y + targetBoundingClientRect.height / 2);
+  let x =
+    sourceBoundingClientRect.x +
+    sourceBoundingClientRect.width / 2 -
+    (targetBoundingClientRect.x + targetBoundingClientRect.width / 2);
+  let y =
+    sourceBoundingClientRect.y +
+    sourceBoundingClientRect.height / 2 -
+    (targetBoundingClientRect.y + targetBoundingClientRect.height / 2);
 
   // scale correction
   x /= target.scaleX;
@@ -57,7 +63,7 @@ export function calculateMagicMove({
   x -= x_delta;
   y -= y_delta;
 
-/*
+  /*
   let skewed_x = x * Math.cos(toRadians(target.skewY));
   let skewed_y = y * Math.cos(toRadians(target.skewX));
 
@@ -79,6 +85,6 @@ export function calculateMagicMove({
     scaleY,
     rotate,
     skewX,
-    skewY
+    skewY,
   };
 }

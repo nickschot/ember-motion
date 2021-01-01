@@ -16,7 +16,7 @@ export default class MotionOrphansComponent extends Component {
     const boundingBox = this.element.getBoundingClientRect();
     this.offsetRect = {
       x: window.pageXOffset + boundingBox.x,
-      y: window.pageYOffset + boundingBox.y
-    }
+      y: window.pageYOffset + boundingBox.y,
+    };
   }
 }
