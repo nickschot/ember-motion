@@ -3,7 +3,7 @@ import { action } from '@ember/object';
 import { task, all } from 'ember-concurrency';
 import {
   copyComputedStyle,
-  getRelativeOffsetRect,
+  getRelativeOffsetRect, positionalValues,
   transformValues
 } from '../-private/util';
 import { inject as service } from '@ember/service';
@@ -150,7 +150,10 @@ export default class MotionComponent extends Component {
         ...decomposed
       } = decomposeTransform(parseTransform(styles.transform));
 
-      const transformAnimation = getTransformAnimation(element, toValuesTransform, {
+      const {
+        animation: transformAnimation,
+        duration: transformDuration
+      } = getTransformAnimation(element, toValuesTransform, {
         x,
         y,
         scaleX: decomposed.scaleX,
@@ -162,7 +165,25 @@ export default class MotionComponent extends Component {
       }, this.args.transition);
 
       const valueAnimations = Object.entries(toValuesNormal)
-        .map(([key, toValue]) => getValueAnimation(element, styles, key, fromValues[key], toValue, transition, undefined, this.boundingBox));
+        .map(([key, toValue]) => {
+          const fromValue = fromValues[key] ?? positionalValues[key]?.(this.boundingBox , styles) ?? styles[key];
+
+          // FIXME: workaround because we do not support "complex" values for springa nimations yet
+          let type = transition.type;
+          let duration = transition.duration;
+          if (isNaN(fromValue) || isNaN(toValue)) {
+            type = "tween";
+            duration = transformDuration;
+          }
+
+          return getValueAnimation({
+            element,
+            key,
+            fromValue,
+            toValue,
+            transition: { ...transition, type, duration }
+          });
+        });
 
       this.animations = [transformAnimation, ...valueAnimations].filter(Boolean);
       yield all(this.animations.map((a) => a.finished));

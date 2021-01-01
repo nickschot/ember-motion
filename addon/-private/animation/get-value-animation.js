@@ -1,12 +1,11 @@
-import {positionalValues} from "../util";
 import {getDefaultTransition} from "../transitions/default";
 import springToKeyframes from "../interpolation/spring";
 import {isTransitionDefined} from "../transitions/util";
 import {getDefaultValueType, getValueAsType} from "../value-types";
 
-export function getValueAnimation(element, styles, key, fromValue, toValue, transition, composite, boundingBox) {
+export function getValueAnimation({ element, key, fromValue, toValue, transition, composite }) {
   const options = {
-    fromValue: fromValue ?? positionalValues[key]?.(boundingBox , styles) ?? styles[key],
+    fromValue,
     toValue,
     initialVelocity: 0
   };
@@ -32,17 +31,17 @@ export function getValueAnimation(element, styles, key, fromValue, toValue, tran
     : { ...options, ...getDefaultTransition(key, toValue)};
 
   let keyframes = [];
-  if (animation.type === "spring") {
-    let frames = springToKeyframes(animation);
-    keyframes = frames.map(({ value }) => ({ [key]: getValueAsType(value, type) }));
-    animation.duration = frames[frames.length - 1].time;
-  } else if (animation.type === "tween") {
+  if (animation.type === "tween") {
     animation.easing = animation.easing ?? "linear";
     animation.duration = animation.duration ?? 300;
     keyframes = [
       { [key]: getValueAsType(animation.fromValue, type) },
       { [key]: getValueAsType(animation.toValue, type) }
     ];
+  } else if (animation.type === "spring") {
+    let frames = springToKeyframes(animation);
+    keyframes = frames.map(({ value }) => ({ [key]: getValueAsType(value, type) }));
+    animation.duration = frames[frames.length - 1].time;
   }
 
   return element.animate(keyframes, {
