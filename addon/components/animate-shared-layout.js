@@ -7,7 +7,7 @@ export default class AnimateSharedLayoutComponent extends Component {
   @service motion;
 
   guid = guidFor(this);
-  children = new Set(); // TODO: layoutId's must be unique among the motions registered here
+  children = new Set(); // TODO: layoutId's must be unique among the motions registered here, add assertion
   element;
   outGoing = new Map();
 
@@ -40,7 +40,26 @@ export default class AnimateSharedLayoutComponent extends Component {
   }
 
   @action
-  notifyDestroying(layoutId, data) {
+  async notifyDestroying(layoutId, data) {
+    const children = [...this.children];
+    const animations = [];
+
+    // Do before measurements on the other children.
+    for (let c of children) {
+      animations.push(c.animateLayout());
+    }
+
+    // Set the outgoing element so it will do it's move.
     this.outGoing.set(layoutId, data);
+
+    // Wait for the after measurements to complete. This also occurs within the
+    // animateLayout call, but after a "microwait". In practice this means it
+    // will always happen after the outgoing element was rendered.
+    await Promise.all(animations);
+
+    // Now we can trigger the actual animation on the children.
+    animations.forEach((taskInstance, i) => {
+      children[i].animate(null, taskInstance.value);
+    });
   }
 }

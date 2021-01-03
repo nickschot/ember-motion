@@ -10,9 +10,6 @@ export function getTransformAnimation(element, toValues, fromValues, transition)
   const fromTransformString = serializeValuesAsTransform(fromValues);
   const toTransformString = serializeValuesAsTransform(toValues);
 
-  console.log('FROM: ', fromTransformString);
-  console.log('TO: ', toTransformString);
-
   if (fromTransformString === toTransformString || (springFrom === 0 && springTo === springFrom)) {
     return element.animate(
       [

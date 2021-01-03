@@ -55,3 +55,57 @@ ul {
   /*border-radius: 50%;*/
   /*transform-origin: 0 0!important;*/ /* TODO: handle in code */
 }
+
+.list-grid {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  max-width: 350px;
+  grid-column-gap: 2rem;
+  margin: 5rem 1rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.list1 {
+  transform: scale(0.75) rotate(-10deg);
+}
+
+.list2 {
+  margin-left: 5rem;
+  transform: rotate(5deg);
+}
+
+.box-shadow {
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  background: #FFF;
+
+  position:relative;
+  box-shadow:0 1px 4px rgba(0, 0, 0, 0.3), 0 0 40px rgba(0, 0, 0, 0.1) inset;
+}
+
+.box-shadow:before,
+.box-shadow:after
+{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  box-shadow:0 0 20px rgba(0,0,0,0.8);
+  top:50%;
+  bottom:0;
+  left:10px;
+  right:10px;
+  border-radius:100px / 10px;
+}
+.box-shadow:after
+{
+  right:10px;
+  left:auto;
+  transform:skew(8deg) rotate(3deg);
+}

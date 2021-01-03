@@ -113,3 +113,7 @@ export function toDegrees(angle) {
 export function toRadians(angle) {
   return angle * (Math.PI / 180);
 }
+
+export function microwait() {
+  return new Promise((resolve) => resolve());
+}

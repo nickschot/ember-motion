@@ -2,6 +2,37 @@
 
 <h2 id="title">Welcome to Ember</h2>
 
+<AnimateSharedLayout class="list-grid">
+  {{#let (hash type="spring" stiffness=2000 damping=300 mass=10) as |spring|}}
+    <ul class="list list1">
+      {{#each this.list1 as |item|}}
+        <Motion
+          @layoutId={{item}}
+          @transition={{spring}}
+          {{on "click" (fn this.moveToList2 item)}}
+        >
+          <div class="box-shadow">
+            {{item}}
+          </div>
+        </Motion>
+      {{/each}}
+    </ul>
+    <ul class="list list2">
+      {{#each this.list2 as |item|}}
+        <Motion
+          @layoutId={{item}}
+          @transition={{spring}}
+          {{on "click" (fn this.moveToList1 item)}}
+        >
+          <div class="box-shadow">
+            {{item}}
+          </div>
+        </Motion>
+      {{/each}}
+    </ul>
+  {{/let}}
+</AnimateSharedLayout>
+
 <button {{on "click" (fn (mut this.x) 0)}} type="button">To the left</button>
 <button {{on "click" (fn (mut this.x) 250)}} type="button">To the right</button>
 

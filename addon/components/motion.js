@@ -1,8 +1,16 @@
 import Component from '@glimmer/component';
 import { action } from '@ember/object';
-import { task, all } from 'ember-concurrency';
-import { copyComputedStyle, getRelativeOffsetRect, positionalValues, transformValues } from '../-private/util';
 import { inject as service } from '@ember/service';
+import { assert } from '@ember/debug';
+import { task, all } from 'ember-concurrency';
+
+import {
+  copyComputedStyle,
+  getRelativeOffsetRect,
+  microwait,
+  positionalValues,
+  transformValues,
+} from '../-private/util';
 import { cumulativeTransform, parseTransform } from '../-private/transform/transform';
 import { decomposeTransform } from '../-private/transform/matrix';
 import { calculateMagicMove } from '../-private/motion/magic-move';
@@ -15,7 +23,10 @@ export default class MotionComponent extends Component {
   element;
   animations = [];
   sharedLayout;
+
+  // measurements
   computedStyles;
+  cumulativeTransform;
   boundingClientRect;
 
   @action
@@ -71,6 +82,11 @@ export default class MotionComponent extends Component {
         animate: this.args.animate,
       });
     }
+
+    assert(
+      `Measurements incomplete. Was the animate action called on insertion?`,
+      this.styles && this.boundingClientRect && this.cumulativeTransform
+    );
   }
 
   @action
@@ -97,7 +113,7 @@ export default class MotionComponent extends Component {
       }
     }*/
 
-    this.animateTask.perform({
+    return this.animateTask.perform({
       element: this.element,
       initial,
       animate,
@@ -107,11 +123,9 @@ export default class MotionComponent extends Component {
     });
   }
 
-  @(task(function* ({ element, initial, animate, exit, transition }) {
+  @(task(function* ({ element, initial, animate = {}, exit, transition }) {
     try {
-      const styles = copyComputedStyle(element);
-      this.styles = styles;
-      this.boundingBox = this.element.getBoundingClientRect();
+      this.updateMeasurements();
 
       const fromValues = initial ?? (this.args.orphan && exit ? animate : {});
       const toValues = exit ?? animate;
@@ -139,7 +153,7 @@ export default class MotionComponent extends Component {
         }
       );
 
-      const { translateX: x, translateY: y, ...decomposed } = decomposeTransform(parseTransform(styles.transform));
+      const { translateX: x, translateY: y, ...decomposed } = decomposeTransform(parseTransform(this.styles.transform));
 
       const { animation: transformAnimation, duration: transformDuration } = getTransformAnimation(
         element,
@@ -158,7 +172,7 @@ export default class MotionComponent extends Component {
       );
 
       const valueAnimations = Object.entries(toValuesNormal).map(([key, toValue]) => {
-        const fromValue = fromValues[key] ?? positionalValues[key]?.(this.boundingBox, styles) ?? styles[key];
+        const fromValue = fromValues[key] ?? positionalValues[key]?.(this.boundingBox, this.styles) ?? this.styles[key];
 
         // FIXME: workaround because we do not support "complex" values for springa nimations yet
         let type = transition.type;
@@ -182,12 +196,56 @@ export default class MotionComponent extends Component {
     } catch (error) {
       console.log('ERROR', error);
     } finally {
+      this.updateMeasurements();
+
       if (this.args.orphan) {
         this.motion.removeOrphan(this.args.orphan);
       }
     }
   }).restartable())
   animateTask;
+
+  @action
+  animateLayout() {
+    return this.animateLayoutTask.perform({
+      sourceTransform: this.cumulativeTransform,
+      sourceBoundingClientRect: this.boundingClientRect,
+    });
+  }
+
+  @(task(function* ({ sourceTransform, sourceBoundingClientRect }) {
+    // measure bounds after layout animation
+    yield microwait();
+
+    this.updateMeasurements();
+
+    const targetTransform = this.cumulativeTransform;
+    const targetBoundingClientRect = this.boundingClientRect;
+
+    const initial = {
+      ...calculateMagicMove({
+        sourceTransform,
+        targetTransform,
+        sourceBoundingClientRect,
+        targetBoundingClientRect,
+      }),
+    };
+
+    const animate = {
+      ...Object.entries(initial).reduce((result, [k, v]) => {
+        // TODO: set appropriate default value for type
+        result[k] = 0;
+        return result;
+      }, {}),
+      scaleX: 1,
+      scaleY: 1,
+      ...this.args.animate,
+    };
+
+    // return animation options
+    return { initial, animate };
+  }).restartable())
+  animateLayoutTask;
 
   @action
   animateIncoming(layoutId) {
@@ -198,8 +256,10 @@ export default class MotionComponent extends Component {
     } = this.sharedLayout.outGoing.get(layoutId);
     this.sharedLayout.outGoing.delete(layoutId);
 
-    const targetTransform = cumulativeTransform(this.element);
-    const targetBoundingClientRect = this.element.getBoundingClientRect();
+    this.updateMeasurements();
+
+    const targetTransform = this.cumulativeTransform;
+    const targetBoundingClientRect = this.boundingClientRect;
 
     const initial = {
       ...initialProps,
@@ -223,6 +283,14 @@ export default class MotionComponent extends Component {
     };
 
     this.animate(null, { initial, animate });
+  }
+
+  @action
+  updateMeasurements() {
+    this.styles = copyComputedStyle(this.element);
+    // TODO: normalize against page offset
+    this.boundingClientRect = this.element.getBoundingClientRect();
+    this.cumulativeTransform = cumulativeTransform(this.element);
   }
 
   /**
