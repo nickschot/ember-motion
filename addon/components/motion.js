@@ -303,6 +303,10 @@ export default class MotionComponent extends Component {
       this.animateTask.cancelAll();
     }
 
+    if (this.animateLayoutTask.isRunning) {
+      this.animateLayoutTask.cancelAll();
+    }
+
     this.boundingClientRect = element.getBoundingClientRect();
     this.computedStyles = copyComputedStyle(element);
     this.cumulativeTransform = cumulativeTransform(element);
